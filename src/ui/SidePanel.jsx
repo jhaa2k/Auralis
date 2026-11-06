@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useStore } from '../core/projectStore.js';
 import MediaPanel from './MediaPanel.jsx';
 import LayerList from './LayerList.jsx';
@@ -12,6 +13,11 @@ export default function SidePanel() {
   const open = useStore((s) => s.panelOpen);
   const tab = useStore((s) => s.activeTab);
   const setOpen = useStore((s) => s.setPanelOpen);
+  const sbRef = useRef(null);
+
+  useEffect(() => {
+    if (sbRef.current) sbRef.current.scrollTop = 0;
+  }, [tab]);
 
   if (!open) return null;
 
@@ -25,7 +31,7 @@ export default function SidePanel() {
           </button>
         </span>
       </div>
-      <div id="sb">
+      <div id="sb" ref={sbRef}>
         {tab === 'lib' && <MediaPanel />}
         {tab === 'lay' && <LayerList />}
         {tab === 'pre' && <PresetLibrary />}
