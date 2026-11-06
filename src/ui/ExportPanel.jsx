@@ -18,15 +18,12 @@ export default function ExportPanel() {
     const canvas = document.getElementById('cv');
     if (!canvas) return;
     
-    // File System Access API
     let dirHandle = null;
     try {
-      if (!settings.exportDir && window.showDirectoryPicker) {
+      if (!window._exportDirHandle && window.showDirectoryPicker) {
         dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' });
-        pushToast('Folder access granted', 'ok');
-        // We can't store the handle in localStorage directly, but we can keep it in memory/IndexedDB if needed. 
-        // For simplicity, we'll just use it for this session.
         window._exportDirHandle = dirHandle;
+        pushToast('Folder access granted', 'ok');
       } else {
         dirHandle = window._exportDirHandle;
       }
@@ -59,7 +56,6 @@ export default function ExportPanel() {
           }
         }
         
-        // Fallback
         setOutputUrl(URL.createObjectURL(blob));
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -68,9 +64,14 @@ export default function ExportPanel() {
         pushToast('Export downloaded', 'ok');
       },
       (err) => { pushToast(err, 'err'); setRecording(false); },
-      (p) => setProgress(p) // Progress callback
+      (p) => setProgress(p)
     );
-    if (rec) { recRef.current = rec; setRecording(true); pushToast('Recording started', 'ok'); }
+    
+    if (rec) { 
+      recRef.current = rec; 
+      setRecording(true); 
+      pushToast('Recording started', 'ok'); 
+    }
   };
 
   const stopRec = () => {
@@ -91,6 +92,7 @@ export default function ExportPanel() {
           </select>
         </label>
       </div>
+      
       <div className="x-grid">
         <label>FPS
           <select value={settings.xfps} onChange={(e) => updateSettings({ xfps: +e.target.value })}>
@@ -103,15 +105,21 @@ export default function ExportPanel() {
           </select>
         </label>
       </div>
+
       <div style={{ background: 'var(--p2)', borderRadius: 'var(--r)', padding: '8px 14px', marginBottom: 8 }}>
         <Range label="Video Mbps" value={settings.mbps} min={1} max={40} step={1} onChange={(v) => updateSettings({ mbps: v })} />
         <Range label="Audio kbps" value={settings.abr} min={64} max={320} step={32} onChange={(v) => updateSettings({ abr: v })} />
       </div>
       
       {recording && (
-        <div style={{ marginBottom: 8 }}>
-          <progress value={progress} max="100" />
-          <div className="dm" style={{ textAlign: 'center' }}>{progress.toFixed(0)}%</div>
+        <div style={{ marginBottom: 12 }}>
+          {/* Ultra Thin Progress Bar */}
+          <div style={{ width: '100%', height: '3px', background: 'var(--ln)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ width: `${progress}%`, height: '100%', background: 'var(--ac)', transition: 'width 0.2s linear' }} />
+          </div>
+          <div className="dm" style={{ textAlign: 'center', marginTop: 6 }}>
+            Rendering... {progress.toFixed(0)}%
+          </div>
         </div>
       )}
 
@@ -129,7 +137,6 @@ export default function ExportPanel() {
           <a className="btn" href={outputUrl} download="audiovis-export.webm" style={{ marginTop: 8 }}>Download manually</a>
         </div>
       )}
-      <div className="dm" style={{ marginTop: 8 }}>Export runs in real-time. For the best quality, use a desktop browser.</div>
     </div>
   );
 }
