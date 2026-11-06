@@ -9,13 +9,22 @@ export default function Transport() {
   const [dur, setDur] = useState(0);
   const [playing, setPlaying] = useState(false);
   const wfRef = useRef(null);
+  const phRef = useRef(null);
 
   useEffect(() => {
     let raf;
     const tick = () => {
-      setTime(getCurrentTime());
-      setDur(getDuration());
+      const t = getCurrentTime();
+      const d = getDuration();
+      setTime(t);
+      setDur(d);
       setPlaying(!isPaused());
+
+      // Update playhead accurately in real-time
+      if (phRef.current && d > 0) {
+        const pct = (t / d) * 100;
+        phRef.current.style.left = `${pct}%`;
+      }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
@@ -28,8 +37,10 @@ export default function Transport() {
   };
 
   const onSeek = (e) => {
+    if (!wfRef.current || dur === 0) return;
     const r = wfRef.current.getBoundingClientRect();
-    seek(((e.clientX - r.left) / r.width) * dur);
+    const pct = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    seek(pct * dur);
   };
 
   return (
@@ -49,7 +60,7 @@ export default function Transport() {
       </div>
       <div className="wfw" ref={wfRef} onClick={onSeek}>
         <canvas id="wf" />
-        <div id="ph" style={{ transform: `translateX(${dur ? (time / dur) * 100 : 0}%)` }} />
+        <div id="ph" ref={phRef} />
       </div>
     </div>
   );
