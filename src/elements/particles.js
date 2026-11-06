@@ -13,11 +13,8 @@ export function renderParticles(ctx, W, H, t, e) {
       const a = (e.velocityAngle || Math.random() * 360) * Math.PI / 180 + (e.useRandomVector ? Math.random() * TAU : 0);
       const sp = (e.speed || 2) * (0.5 + Math.random() * (1 + (e.speedRandom || 0))) * u;
       P.push({
-        x: 0, y: 0,
-        vx: Math.cos(a) * sp,
-        vy: Math.sin(a) * sp,
-        l: 1,
-        life: Math.max(0.3, e.lifetime || 2),
+        x: 0, y: 0, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        l: 1, life: Math.max(0.3, e.lifetime || 2),
         size: (e.startSize || 2) * (e.particleScale || 100) / 100,
         phase: Math.random() * TAU,
         sineFreq: (e.sideSineFreq || 0) + (Math.random() - 0.5) * (e.sideSineFreqRandom || 0),
@@ -32,9 +29,7 @@ export function renderParticles(ctx, W, H, t, e) {
 
   for (let i = P.length - 1; i >= 0; i--) {
     const p = P[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += g * u * 0.03;
+    p.x += p.vx; p.y += p.vy; p.vy += g * u * 0.03;
     p.l -= 0.012 / p.life;
     if (p.l <= 0) { P.splice(i, 1); continue; }
 
@@ -47,9 +42,14 @@ export function renderParticles(ctx, W, H, t, e) {
     }
 
     ctx.globalAlpha = a0 * p.l;
-    ctx.fillStyle = e.colorFrom || e.color;
     const zz = Math.max(1, z * p.size * scale);
-    ctx.fillRect(p.x - zz / 2, p.y - zz / 2, zz, zz);
+
+    if (e._img && e._img.width) {
+      ctx.drawImage(e._img, p.x - zz / 2, p.y - zz / 2, zz, zz);
+    } else {
+      ctx.fillStyle = e.colorFrom || e.color;
+      ctx.fillRect(p.x - zz / 2, p.y - zz / 2, zz, zz);
+    }
   }
   ctx.globalAlpha = a0;
 }
