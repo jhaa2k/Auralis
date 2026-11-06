@@ -15,36 +15,21 @@ export function renderWaveCircular(ctx, W, H, t, e) { drawTrace(ctx, W, H, t, e,
 
 export function renderScope(ctx, W, H, t, e) {
   ctx.save();
-  ctx.globalAlpha *= 0.2;
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = e.color;
+  ctx.globalAlpha *= 0.2; ctx.lineWidth = 1; ctx.strokeStyle = e.color;
   const w = W * 0.8;
-  for (let i = 0; i <= 8; i++) {
-    ctx.beginPath();
-    ctx.moveTo(-w / 2 + (w * i) / 8, -H * 0.25);
-    ctx.lineTo(-w / 2 + (w * i) / 8, H * 0.25);
-    ctx.stroke();
-  }
-  for (let i = 0; i <= 4; i++) {
-    ctx.beginPath();
-    ctx.moveTo(-w / 2, -H * 0.25 + (H * 0.5 * i) / 4);
-    ctx.lineTo(w / 2, -H * 0.25 + (H * 0.5 * i) / 4);
-    ctx.stroke();
-  }
+  for (let i = 0; i <= 8; i++) { ctx.beginPath(); ctx.moveTo(-w / 2 + (w * i) / 8, -H * 0.25); ctx.lineTo(-w / 2 + (w * i) / 8, H * 0.25); ctx.stroke(); }
+  for (let i = 0; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(-w / 2, -H * 0.25 + (H * 0.5 * i) / 4); ctx.lineTo(w / 2, -H * 0.25 + (H * 0.5 * i) / 4); ctx.stroke(); }
   ctx.restore();
   drawTrace(ctx, W, H, t, e, false);
 }
 
 function drawTrace(ctx, W, H, t, e, circle) {
   const td = getTimeDomain();
-  const R = Math.min(W, H) * 0.22;
-  const w = W * 0.8;
+  const R = Math.min(W, H) * 0.22, w = W * 0.8;
   const p = Math.max(16, Math.min(td.length, e.n * 4));
   const A = (circle ? R * 0.4 : H * 0.2) * (e.sens / 100) * (e.maxH / 100);
 
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = (e.thick / 10) + 1;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = (e.thick / 10) + 1;
   ctx.strokeStyle = fillFor(ctx, e, -w / 2, -H * 0.2, w, H * 0.4, t);
   ctx.fillStyle = ctx.strokeStyle;
 
@@ -62,20 +47,15 @@ function drawTrace(ctx, W, H, t, e, circle) {
     ctx.beginPath();
     for (let i = 0; i <= p; i++) {
       const [x, y] = pt(i, m);
-      if (e.ws === 'spiky' && !circle) {
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, y);
-      } else if (i) ctx.lineTo(x, y);
+      if (e.ws === 'spiky' && !circle) { ctx.moveTo(x, 0); ctx.lineTo(x, y); }
+      else if (i) ctx.lineTo(x, y);
       else ctx.moveTo(x, y);
     }
     if (circle) ctx.closePath();
     if (e.wfill && !circle) {
       const a0 = ctx.globalAlpha;
-      ctx.lineTo(w / 2, 0);
-      ctx.lineTo(-w / 2, 0);
-      ctx.globalAlpha = a0 * 0.35;
-      ctx.fill();
-      ctx.globalAlpha = a0;
+      ctx.lineTo(w / 2, 0); ctx.lineTo(-w / 2, 0);
+      ctx.globalAlpha = a0 * 0.35; ctx.fill(); ctx.globalAlpha = a0;
     }
     ctx.stroke();
   }
