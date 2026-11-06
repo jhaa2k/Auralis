@@ -28,7 +28,6 @@ export function initAudio() {
   pre = ac.createGain();
   let chain = pre;
 
-  // EQ
   eqFilters = EQ_FREQS.map((f, i) => {
     const b = ac.createBiquadFilter();
     b.type = i === 0 ? 'lowshelf' : i === 9 ? 'highshelf' : 'peaking';
@@ -44,7 +43,6 @@ export function initAudio() {
   bassShelf.frequency.value = 120;
   chain.connect(bassShelf);
 
-  // Distortion
   shaper = ac.createWaveShaper();
   shaperDry = ac.createGain();
   shaperWet = ac.createGain();
@@ -53,7 +51,6 @@ export function initAudio() {
   bassShelf.connect(shaperDry).connect(shaperMix);
   bassShelf.connect(shaper).connect(shaperWet).connect(shaperMix);
 
-  // Delay
   delay = ac.createDelay(2);
   delay.delayTime.value = 0.32;
   delayFeedback = ac.createGain();
@@ -66,7 +63,6 @@ export function initAudio() {
   shaperMix.connect(delayDry).connect(delayStage);
   shaperMix.connect(delay).connect(delayWet).connect(delayStage);
 
-  // Reverb
   convolver = ac.createConvolver();
   const len = ac.sampleRate * 2;
   const ir = ac.createBuffer(2, len, ac.sampleRate);
@@ -84,28 +80,21 @@ export function initAudio() {
   delayStage.connect(reverbDry).connect(reverbStage);
   delayStage.connect(convolver).connect(reverbWet).connect(reverbStage);
 
-  // Panning
   pan = ac.createStereoPanner ? ac.createStereoPanner() : ac.createGain();
   reverbStage.connect(pan);
 
-  // Analyser for Visuals
   analyser = ac.createAnalyser();
   analyser.fftSize = 2048;
   analyser.smoothingTimeConstant = 0.5;
 
-  // Main Output Gain
   vg = ac.createGain();
-
-  // ** MEDIA STREAM DESTINATION FOR EXPORT **
   dest = ac.createMediaStreamDestination();
 
-  // Connect graph
   pan.connect(analyser);
   analyser.connect(vg);
-  vg.connect(ac.destination); // To speakers
-  pan.connect(dest);           // To MediaRecorder for export
+  vg.connect(ac.destination);
+  pan.connect(dest);
 
-  // Left/Right Channel Splitting
   splitter = ac.createChannelSplitter(2);
   analyserL = ac.createAnalyser();
   analyserR = ac.createAnalyser();
@@ -225,4 +214,36 @@ export function applyAudioSettings(s) {
 
   if (analyser.fftSize !== +s.fft) analyser.fftSize = +s.fft;
   analyser.smoothingTimeConstant = s.smooth / 100;
+}
+
+/* ===== MEDIA SESSION NOTIFICATION CONTROLS ===== */
+
+export function setupMediaSession(handlers) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', handlers.play);
+    navigator.mediaSession.setActionHandler('pause', handlers.pause);
+    navigator.mediaSession.setActionHandler('nexttrack', handlers.next);
+    navigator.mediaSession.setActionHandler('previoustrack', handlers.prev);
+    navigator.mediaSession.setActionHandler('seekbackward', handlers.seekBack);
+    navigator.mediaSession.setActionHandler('seekforward', handlers.seekFwd);
+  }
+}
+
+export function setMediaMetadata(title, artist, album, artworkUrl) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: title || 'Unknown Track',
+      artist: artist || 'AUDIOVIS Studio',
+      album: album || 'Local Session',
+      artwork: [
+        { src: artworkUrl || 'https://dummyimage.com/512x512/262624/d97757&text=AUDIOVIS', sizes: '512x512', type: 'image/png' }
+      ]
+    });
+  }
+}
+
+export function updateMediaSession(state) {
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.playbackState = state;
+  }
 }
