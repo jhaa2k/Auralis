@@ -6,8 +6,6 @@ import { useAnimationLoop } from '../hooks/useAnimationLoop.js';
 
 export default function Stage() {
   const canvasRef = useRef(null);
-  
-  // Subscribe to everything needed so React renders the newest state
   const layers = useStore((s) => s.layers);
   const scene = useStore((s) => s.scene);
   const settings = useStore((s) => s.settings);
@@ -17,7 +15,6 @@ export default function Stage() {
   const [drag, setDrag] = useState(null);
   const [res, setRes] = useState('');
 
-  // Keep refs up to date for the animation loop
   const stateRef = useRef({ layers, scene, settings });
   useEffect(() => {
     stateRef.current = { layers, scene, settings };
@@ -26,7 +23,7 @@ export default function Stage() {
   useAnimationLoop((now) => {
     const cv = canvasRef.current;
     if (!cv) return;
-    const ctx = cv.getContext('2d', { alpha: false, willReadFrequently: false });
+    const ctx = cv.getContext('2d', { alpha: false });
     const s = stateRef.current;
     
     analyse(now, s.settings);
@@ -45,20 +42,27 @@ export default function Stage() {
     }
   });
 
-  // Update Resolution / Quality based on selected settings
+  // Calculate true internal resolution
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
     
-    let baseW = 960;
-    let baseH = 540;
-    if (settings.ratio === '9:16') { baseW = 540; baseH = 960; }
-    else if (settings.ratio === '1:1') { baseW = 720; baseH = 720; }
+    let baseW = 1280;
+    let baseH = 720;
+    if (settings.ratio === '9:16') { baseW = 720; baseH = 1280; }
+    else if (settings.ratio === '1:1') { baseW = 1000; baseH = 1000; }
+    else if (settings.ratio === '4:5') { baseW = 800; baseH = 1000; }
     
+    // Apply the preview quality scale
     const scale = settings.pq / 100;
-    cv.width = Math.round(baseW * scale);
-    cv.height = Math.round(baseH * scale);
-    setRes(`${cv.width}×${cv.height} (${settings.pq}%)`);
+    const targetW = Math.round(baseW * scale);
+    const targetH = Math.round(baseH * scale);
+    
+    if (cv.width !== targetW || cv.height !== targetH) {
+      cv.width = targetW;
+      cv.height = targetH;
+      setRes(`${targetW}×${targetH}`);
+    }
   }, [settings.pq, settings.ratio]);
 
   const onPointerDown = (e) => {
