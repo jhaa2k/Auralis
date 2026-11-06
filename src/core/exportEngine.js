@@ -1,4 +1,4 @@
-import { getDestinationStream } from './audioEngine.js';
+import { getDestinationStream, getCurrentTime, getDuration } from './audioEngine.js';
 
 export function listFormats() {
   if (!window.MediaRecorder) return [];
@@ -11,7 +11,7 @@ export function listFormats() {
   return c.filter((x) => MediaRecorder.isTypeSupported(x[0]));
 }
 
-export function startRecord(canvas, settings, onDone, onError) {
+export function startRecord(canvas, settings, onDone, onError, onProgress) {
   const formats = listFormats();
   if (!formats.length) { onError?.('No supported recording format'); return null; }
   const fmt = formats[settings.fmt] || formats[0];
@@ -37,8 +37,18 @@ export function startRecord(canvas, settings, onDone, onError) {
   rec.onstop = () => {
     const blob = new Blob(chunks, { type: fmt[0].split(';')[0] });
     const ext = fmt[0].includes('mp4') ? 'mp4' : 'webm';
-    onDone?.(blob, `audiovis.${ext}`);
+    onDone?.(blob, `audiovis_export.${ext}`);
   };
+  
   rec.start(1000);
+  
+  // Progress polling
+  const duration = getDuration();
+  const interval = setInterval(() => {
+    if (rec.state === 'inactive') { clearInterval(interval); return; }
+    const cur = getCurrentTime();
+    if (duration > 0) onProgress?.(Math.min(100, (cur / duration) * 100));
+  }, 200);
+  
   return rec;
 }
