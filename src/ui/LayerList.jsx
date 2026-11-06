@@ -19,17 +19,20 @@ export default function LayerList() {
   const [type, setType] = useState('bars');
 
   return (
-    <div>
-      <div className="row" style={{ marginBottom: 8 }}>
-        <select value={type} onChange={(e) => setType(e.target.value)}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+      <div className="row" style={{ marginBottom: 0 }}>
+        <select value={type} onChange={(e) => setType(e.target.value)} style={{ minWidth: 0 }}>
           {TYPES.map((t) => <option key={t}>{t}</option>)}
         </select>
-        <button className="pri" onClick={() => addLayer(type)}>Add layer</button>
+        <button className="pri" onClick={() => addLayer(type)} style={{ flex: '0 0 auto' }}>
+          Add layer
+        </button>
       </div>
-      <div id="llist" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+      <div id="llist">
+        {layers.length === 0 && <div className="dm">No layers yet.</div>}
         {[...layers].reverse().map((l) => (
           <div key={l._id} className={`it ${l._id === selectedId ? 'sl' : ''} ${l.lock ? 'lkd' : ''}`}>
-            <button onClick={() => selectLayer(l._id)}>
+            <button onClick={() => selectLayer(l._id)} title={l.name || l.type}>
               {l.name || l.type} <span className="dm">{l.type}</span>
             </button>
             <button onClick={() => toggleVisibility(l._id)} aria-label="Visibility">
