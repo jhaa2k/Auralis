@@ -21,9 +21,9 @@ export default function Transport() {
       setDur(d);
       setPlaying(!isPaused());
 
-      // Update playhead accurately in real-time
+      // Safely update the playhead
       if (phRef.current && d > 0) {
-        const pct = (t / d) * 100;
+        const pct = Math.max(0, Math.min(100, (t / d) * 100));
         phRef.current.style.left = `${pct}%`;
       }
       raf = requestAnimationFrame(tick);
@@ -52,7 +52,7 @@ export default function Transport() {
   return (
     <div className="tp">
       <div className="tr1">
-        <span>No track loaded</span>
+        <span>{dur > 0 ? 'Track Loaded' : 'No track loaded'}</span>
         <span>{fmtTime(time)} / {fmtTime(dur)}</span>
       </div>
       <div className="tr2">
@@ -65,10 +65,11 @@ export default function Transport() {
         <button><svg className="i"><use href="#i-repeat" /></svg></button>
       </div>
       
-      {/* The 'loaded' class ensures the playhead only appears when duration > 0 */}
-      <div className={`wfw ${dur > 0 ? 'loaded' : ''}`} ref={wfRef} onClick={onSeek}>
-        <canvas id="wf" />
-        <div id="ph" ref={phRef} />
+      {/* Container for waveform */}
+      <div className="wfw" ref={wfRef} onClick={onSeek}>
+        {/* Only render the canvas and playhead if there is audio loaded */}
+        {dur > 0 && <canvas id="wf" />}
+        {dur > 0 && <div id="ph" ref={phRef} />}
       </div>
     </div>
   );
