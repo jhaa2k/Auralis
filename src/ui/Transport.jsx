@@ -1,16 +1,29 @@
 import { useStore } from '../core/projectStore.js';
-import { play, pause, isPaused, getCurrentTime, getDuration, seek } from '../core/audioEngine.js';
+import { 
+  play, pause, isPaused, getCurrentTime, getDuration, seek, 
+  setMediaMetadata, updateMediaSession 
+} from '../core/audioEngine.js';
 import { fmtTime } from '../core/constants.js';
 import { useEffect, useRef, useState } from 'react';
 
 export default function Transport() {
+  const audio = useStore((s) => s.audio);
   const setAudioState = useStore((s) => s.setAudioState);
+  
   const [time, setTime] = useState(0);
   const [dur, setDur] = useState(0);
   const [playing, setPlaying] = useState(false);
   
   const wfRef = useRef(null);
   const phRef = useRef(null);
+
+  // Update the OS Notification Title when a track loads
+  useEffect(() => {
+    if (audio.cur >= 0 && audio.files[audio.cur]) {
+      const track = audio.files[audio.cur];
+      setMediaMetadata(track.name, 'AUDIOVIS Studio', 'Local Session');
+    }
+  }, [audio.cur, audio.files]);
 
   useEffect(() => {
     let raf;
@@ -19,9 +32,13 @@ export default function Transport() {
       const d = getDuration();
       setTime(t);
       setDur(d);
-      setPlaying(!isPaused());
+      
+      const currentlyPlaying = !isPaused();
+      setPlaying(currentlyPlaying);
+      
+      // Sync notification icon
+      updateMediaSession(currentlyPlaying ? 'playing' : 'paused');
 
-      // Safely update the playhead
       if (phRef.current && d > 0) {
         const pct = Math.max(0, Math.min(100, (t / d) * 100));
         phRef.current.style.left = `${pct}%`;
@@ -52,7 +69,7 @@ export default function Transport() {
   return (
     <div className="tp">
       <div className="tr1">
-        <span>{dur > 0 ? 'Track Loaded' : 'No track loaded'}</span>
+        <span>{dur > 0 ? (audio.files[audio.cur]?.name || 'Track Loaded') : 'No track loaded'}</span>
         <span>{fmtTime(time)} / {fmtTime(dur)}</span>
       </div>
       <div className="tr2">
@@ -65,9 +82,7 @@ export default function Transport() {
         <button><svg className="i"><use href="#i-repeat" /></svg></button>
       </div>
       
-      {/* Container for waveform */}
       <div className="wfw" ref={wfRef} onClick={onSeek}>
-        {/* Only render the canvas and playhead if there is audio loaded */}
         {dur > 0 && <canvas id="wf" />}
         {dur > 0 && <div id="ph" ref={phRef} />}
       </div>
