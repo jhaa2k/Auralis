@@ -13,7 +13,8 @@ export default function App() {
   const settings = useStore((s) => s.settings);
   const pushToast = useStore((s) => s.pushToast);
   const toasts = useStore((s) => s.toasts);
-  const [showSet, setShowSet] = useStore((s) => [s.showSettings, s.setShowSettings]);
+  const showSet = useStore((s) => s.showSettings);
+  const setShowSettings = useStore((s) => s.setShowSettings);
 
   useEffect(() => {
     const t = settings.theme || 'Claude Dark';
@@ -22,19 +23,26 @@ export default function App() {
     ['--bg', '--pn', '--ln', '--tx', '--dm', '--ac'].forEach((k, i) => r.setProperty(k, theme[i]));
 
     initAudio();
-    applyAudioSettings(settings, 1);
+    applyAudioSettings(settings);
     setOnEnded(() => pushToast('Track ended', ''));
 
-    const checkWide = () => {
-      if (window.innerWidth >= 820) useStore.getState().setPanelOpen(true);
+    const syncWide = () => {
+      const wide = window.innerWidth >= 820;
+      document.body.classList.toggle('wide', wide);
+      const store = useStore.getState();
+      if (wide) store.setPanelOpen(true);
     };
-    checkWide();
-    window.addEventListener('resize', checkWide);
-    return () => window.removeEventListener('resize', checkWide);
+    syncWide();
+    window.addEventListener('resize', syncWide);
+    window.addEventListener('orientationchange', syncWide);
+    return () => {
+      window.removeEventListener('resize', syncWide);
+      window.removeEventListener('orientationchange', syncWide);
+    };
   }, []);
 
   useEffect(() => {
-    applyAudioSettings(settings, 1);
+    applyAudioSettings(settings);
   }, [settings]);
 
   return (
@@ -48,7 +56,7 @@ export default function App() {
         <SidePanel />
       </main>
       <Nav />
-      <SettingsModal open={!!showSet} onClose={() => setShowSet(false)} />
+      <SettingsModal open={!!showSet} onClose={() => setShowSettings(false)} />
       <div id="toast">
         {toasts.map((t) => (
           <div key={t.id} className={`show ${t.kind}`}>{t.msg}</div>
