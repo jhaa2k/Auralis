@@ -6,7 +6,10 @@ import Nav from './ui/Nav.jsx';
 import SidePanel from './ui/SidePanel.jsx';
 import SettingsModal from './ui/SettingsModal.jsx';
 import { useStore } from './core/projectStore.js';
-import { initAudio, setOnEnded, applyAudioSettings } from './core/audioEngine.js';
+import { 
+  initAudio, setOnEnded, applyAudioSettings, 
+  play, pause, getCurrentTime, getDuration, seek, setupMediaSession 
+} from './core/audioEngine.js';
 import { THEMES } from './core/constants.js';
 
 export default function App() {
@@ -15,6 +18,7 @@ export default function App() {
   const toasts = useStore((s) => s.toasts);
   const showSet = useStore((s) => s.showSettings);
   const setShowSettings = useStore((s) => s.setShowSettings);
+  const setAudioState = useStore((s) => s.setAudioState);
 
   useEffect(() => {
     const t = settings.theme || 'Claude Dark';
@@ -26,11 +30,19 @@ export default function App() {
     applyAudioSettings(settings);
     setOnEnded(() => pushToast('Track ended', ''));
 
+    setupMediaSession({
+      play: () => { play(); setAudioState({ playing: true }); },
+      pause: () => { pause(); setAudioState({ playing: false }); },
+      next: () => pushToast('Next track', 'ok'),
+      prev: () => pushToast('Prev track', 'ok'),
+      seekBack: () => seek(Math.max(0, getCurrentTime() - 10)),
+      seekFwd: () => seek(Math.min(getDuration(), getCurrentTime() + 10))
+    });
+
     const syncWide = () => {
       const wide = window.innerWidth >= 820;
       document.body.classList.toggle('wide', wide);
-      const store = useStore.getState();
-      if (wide) store.setPanelOpen(true);
+      if (wide) useStore.getState().setPanelOpen(true);
     };
     syncWide();
     window.addEventListener('resize', syncWide);
@@ -41,9 +53,7 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    applyAudioSettings(settings);
-  }, [settings]);
+  useEffect(() => { applyAudioSettings(settings); }, [settings]);
 
   return (
     <div id="app">
