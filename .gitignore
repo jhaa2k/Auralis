@@ -3,6 +3,10 @@
 build/
 .kotlin/
 
+# Node.js and Vite
+node_modules/
+dist/
+
 # Local configuration file (sdk path, etc)
 local.properties
 

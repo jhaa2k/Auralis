@@ -1,0 +1,19 @@
+{
+  "name": "AUDIOVIS Studio Pro",
+  "short_name": "AUDIOVIS",
+  "description": "Element-based audio visualization editor",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#262624",
+  "theme_color": "#262624",
+  "start_url": "./",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzI2MjYyNCIvPjxwYXRoIGQ9Ik0xMjggMjU2bDMyLTY0IDMyIDEyOCAzMi0xOTIgMzIgMjU2IDMyLTEyOCAzMiA2NCAzMi0zMiIgc3Ryb2tlPSIjRDk3NzU3IiBzdHJva2Utd2lkdGg9IjMyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
