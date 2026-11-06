@@ -22,8 +22,12 @@ export default function Nav() {
           key={id}
           className={panelOpen && activeTab === id ? 'on' : ''}
           onClick={() => {
-            if (panelOpen && activeTab === id) setPanelOpen(false);
-            else { setActiveTab(id); setPanelOpen(true); }
+            if (panelOpen && activeTab === id) {
+              setPanelOpen(false);
+            } else {
+              setActiveTab(id);
+              setPanelOpen(true);
+            }
           }}
         >
           <svg className="i"><use href={`#i-${ico}`} /></svg>
