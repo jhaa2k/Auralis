@@ -186,7 +186,17 @@ export default function Inspector() {
           type="text"
           value={layer.name}
           onChange={(e) => handle('name', e.target.value)}
-          style={{ flex: 2, minHeight: 40, background: 'transparent', padding: '0 14px', fontWeight: 600, fontSize: 13, border: 0, color: 'var(--tx)' }}
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            minHeight: 40,
+            background: 'transparent',
+            padding: '0 14px',
+            fontWeight: 600,
+            fontSize: 13,
+            border: 0,
+            color: 'var(--tx)'
+          }}
         />
       </div>
       {BASIC_SECTIONS.map(([sec, fields]) => {
