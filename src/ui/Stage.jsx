@@ -6,22 +6,33 @@ import { useAnimationLoop } from '../hooks/useAnimationLoop.js';
 
 export default function Stage() {
   const canvasRef = useRef(null);
+  
+  // Subscribe to everything needed so React renders the newest state
   const layers = useStore((s) => s.layers);
   const scene = useStore((s) => s.scene);
   const settings = useStore((s) => s.settings);
   const selectedId = useStore((s) => s.selectedId);
   const updateLayer = useStore((s) => s.updateLayer);
+  
   const [drag, setDrag] = useState(null);
   const [res, setRes] = useState('');
+
+  // Keep refs up to date for the animation loop
+  const stateRef = useRef({ layers, scene, settings });
+  useEffect(() => {
+    stateRef.current = { layers, scene, settings };
+  }, [layers, scene, settings]);
 
   useAnimationLoop((now) => {
     const cv = canvasRef.current;
     if (!cv) return;
-    const ctx = cv.getContext('2d');
-    analyse(now, settings);
-    renderFrame(ctx, cv.width, cv.height, now / 1000, { layers, scene });
+    const ctx = cv.getContext('2d', { alpha: false, willReadFrequently: false });
+    const s = stateRef.current;
+    
+    analyse(now, s.settings);
+    renderFrame(ctx, cv.width, cv.height, now / 1000, { layers: s.layers, scene: s.scene });
 
-    if (settings.guides) {
+    if (s.settings.guides) {
       const u = cv.height / 720;
       ctx.strokeStyle = 'rgba(255,255,255,.3)';
       ctx.lineWidth = u;
@@ -34,15 +45,21 @@ export default function Stage() {
     }
   });
 
+  // Update Resolution / Quality based on selected settings
   useEffect(() => {
     const cv = canvasRef.current;
     if (!cv) return;
-    const w = Math.round((cv.clientWidth * settings.pq) / 100);
-    const h = Math.round((cv.clientHeight * settings.pq) / 100);
-    cv.width = w;
-    cv.height = h;
-    setRes(`${w}×${h}`);
-  }, [settings.pq, settings.res, settings.ratio]);
+    
+    let baseW = 960;
+    let baseH = 540;
+    if (settings.ratio === '9:16') { baseW = 540; baseH = 960; }
+    else if (settings.ratio === '1:1') { baseW = 720; baseH = 720; }
+    
+    const scale = settings.pq / 100;
+    cv.width = Math.round(baseW * scale);
+    cv.height = Math.round(baseH * scale);
+    setRes(`${cv.width}×${cv.height} (${settings.pq}%)`);
+  }, [settings.pq, settings.ratio]);
 
   const onPointerDown = (e) => {
     const layer = layers.find((l) => l._id === selectedId);
@@ -52,6 +69,7 @@ export default function Stage() {
     setDrag({ sx: e.clientX, sy: e.clientY, x: layer.x, y: layer.y, w: r.width, h: r.height });
     cv.setPointerCapture(e.pointerId);
   };
+
   const onPointerMove = (e) => {
     if (!drag) return;
     const dx = ((e.clientX - drag.sx) / drag.w) * 100;
@@ -61,6 +79,7 @@ export default function Stage() {
       y: Math.max(0, Math.min(100, drag.y + dy))
     });
   };
+
   const onPointerUp = () => setDrag(null);
 
   return (
