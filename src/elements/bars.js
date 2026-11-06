@@ -35,23 +35,15 @@ export function fillFor(ctx, eff, bx, by, bw, bh, t) {
   let g;
   if (eff.grad === 'radial') g = ctx.createRadialGradient(cx, cy, 0, cx, cy, d);
   else if (eff.grad === 'conic' && ctx.createConicGradient) g = ctx.createConicGradient(a, cx, cy);
-  else {
-    g = ctx.createLinearGradient(
-      cx - Math.cos(a) * d, cy - Math.sin(a) * d,
-      cx + Math.cos(a) * d, cy + Math.sin(a) * d
-    );
-  }
+  else g = ctx.createLinearGradient(cx - Math.cos(a) * d, cy - Math.sin(a) * d, cx + Math.cos(a) * d, cy + Math.sin(a) * d);
   const cs = eff.three ? [eff.color, eff.color2, eff.color3] : [eff.color, eff.color2];
   cs.forEach((c, i) => g.addColorStop(i / (cs.length - 1), c));
   return g;
 }
 
 function roundRectPath(ctx, x, y, w, h, r) {
-  if (r > 0 && ctx.roundRect) {
-    ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2));
-  } else {
-    ctx.rect(x, y, w, h);
-  }
+  if (r > 0 && ctx.roundRect) ctx.roundRect(x, y, w, h, Math.min(r, w / 2, h / 2));
+  else ctx.rect(x, y, w, h);
 }
 
 export function renderBars(ctx, W, H, t, e, layer, horizontal = false) {
@@ -76,10 +68,13 @@ export function renderBars(ctx, W, H, t, e, layer, horizontal = false) {
     let v;
     if (e.mir === 'sym') v = bv(e, Math.min(nh - 1, Math.floor(Math.abs(i - (n - 1) / 2))), nh);
     else v = bv(e, e.flipInput ? n - 1 - i : i, n);
+    
     let h = Math.max(1, v * len * (1 - (e.rvar / 100) * (e._rv?.[i] ?? (e._rv || (e._rv = {}))[i] ?? (e._rv[i] = Math.random()))));
     h = clamp(h, (len * e.minHeightScale) / 100, (len * e.maxHeightScale) / 100);
+    
     const x = -span / 2 + i * sl + (sl - bw) / 2;
     const r = (e.round * bw) / 100;
+    
     if (!dn) roundRectPath(ctx, x, -h, bw, h, r);
     if (dn || both) roundRectPath(ctx, x, 0, bw, h, r);
     if (mirr) roundRectPath(mp, x, 0, bw, h * 0.6, r);
@@ -93,9 +88,7 @@ export function renderBars(ctx, W, H, t, e, layer, horizontal = false) {
 }
 
 export function renderCircle(ctx, W, H, t, e) { drawCircleBars(ctx, W, H, t, e, 0, 1); }
-export function renderMultiRing(ctx, W, H, t, e) {
-  for (let k = 0; k < e.rings; k++) drawCircleBars(ctx, W, H, t, e, k, e.rings);
-}
+export function renderMultiRing(ctx, W, H, t, e) { for (let k = 0; k < e.rings; k++) drawCircleBars(ctx, W, H, t, e, k, e.rings); }
 
 function drawCircleBars(ctx, W, H, t, e, k, K) {
   const R = Math.min(W, H) * 0.22;
@@ -110,14 +103,11 @@ function drawCircleBars(ctx, W, H, t, e, k, K) {
   for (let i = 0; i < n; i++) {
     const v = e.mir !== 'none' ? bv(e, i < nh ? i : n - 1 - i, nh) : bv(e, i + k * n, n * K);
     const a = ((e.a0 + (e.a1 - e.a0) * i / n) * Math.PI) / 180;
-    const c = Math.cos(a);
-    const s = Math.sin(a);
-    const l = v * len;
+    const c = Math.cos(a), s = Math.sin(a), l = v * len;
     let p = r0, q = r0 + l;
     if (e.odir === 'in') q = Math.max(0, r0 - l);
     else if (e.odir === 'both') { p = Math.max(0, r0 - l / 2); q = r0 + l / 2; }
-    ctx.moveTo(c * p, s * p);
-    ctx.lineTo(c * q, s * q);
+    ctx.moveTo(c * p, s * p); ctx.lineTo(c * q, s * q);
   }
   ctx.stroke();
 }
@@ -152,8 +142,7 @@ export function renderRing(ctx, W, H, t, e) {
     if (i) ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
     else ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
   }
-  ctx.closePath();
-  ctx.stroke();
+  ctx.closePath(); ctx.stroke();
 }
 
 export function renderPulse(ctx, W, H, t, e) {
@@ -168,82 +157,51 @@ export function renderPulse(ctx, W, H, t, e) {
     p.a -= 0.018;
     if (p.a <= 0) { P.splice(i, 1); continue; }
     ctx.globalAlpha = (e.op / 100) * p.a;
-    ctx.beginPath();
-    ctx.arc(0, 0, p.r, 0, TAU);
-    ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, TAU); ctx.stroke();
   }
 }
 
 export function renderDots(ctx, W, H, t, e) {
-  const span = W * 0.8;
-  const len = H * 0.35 * (e.maxH / 100);
-  const n = e.n;
-  const sl = span / n;
+  const span = W * 0.8, len = H * 0.35 * (e.maxH / 100), n = e.n, sl = span / n;
   ctx.fillStyle = fillFor(ctx, e, -span / 2, -len, span, len, t);
   for (let i = 0; i < n; i++) {
-    const v = bv(e, i, n);
-    const x = -span / 2 + i * sl + sl / 2;
-    ctx.beginPath();
-    ctx.arc(x, -v * len, Math.max(2, sl * 0.35 * (e.thick / 70)), 0, TAU);
-    ctx.fill();
+    const v = bv(e, i, n), x = -span / 2 + i * sl + sl / 2;
+    ctx.beginPath(); ctx.arc(x, -v * len, Math.max(2, sl * 0.35 * (e.thick / 70)), 0, TAU); ctx.fill();
   }
 }
 
 export function renderLines(ctx, W, H, t, e) {
-  const span = W * 0.8;
-  const len = H * 0.35 * (e.maxH / 100);
-  const n = e.n;
-  const sl = span / n;
+  const span = W * 0.8, len = H * 0.35 * (e.maxH / 100), n = e.n, sl = span / n;
   ctx.strokeStyle = fillFor(ctx, e, -span / 2, -len, span, len, t);
   ctx.fillStyle = ctx.strokeStyle;
   ctx.lineWidth = Math.max(1, (sl * e.thick) / 100 * 0.4);
   for (let i = 0; i < n; i++) {
-    const v = bv(e, i, n);
-    const x = -span / 2 + i * sl + sl / 2;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, -v * len);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(x, -v * len, ctx.lineWidth, 0, TAU);
-    ctx.fill();
+    const v = bv(e, i, n), x = -span / 2 + i * sl + sl / 2;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, -v * len); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, -v * len, ctx.lineWidth, 0, TAU); ctx.fill();
   }
 }
 
 export function renderBlocks(ctx, W, H, t, e) {
-  const span = W * 0.8;
-  const len = H * 0.35 * (e.maxH / 100);
-  const n = e.n;
-  const sl = span / n;
+  const span = W * 0.8, len = H * 0.35 * (e.maxH / 100), n = e.n, sl = span / n;
   ctx.fillStyle = fillFor(ctx, e, -span / 2, -len, span, len, t);
   for (let i = 0; i < n; i++) {
-    const v = bv(e, i, n);
-    const x = -span / 2 + i * sl + sl / 2;
-    const bh = len / e.seg;
-    const lit = Math.floor(v * e.seg);
-    for (let b = 0; b < lit; b++) {
-      ctx.fillRect(x - (sl * e.thick) / 200, -(b + 1) * bh, (sl * e.thick) / 100, bh * 0.8);
-    }
+    const v = bv(e, i, n), x = -span / 2 + i * sl + sl / 2, bh = len / e.seg, lit = Math.floor(v * e.seg);
+    for (let b = 0; b < lit; b++) ctx.fillRect(x - (sl * e.thick) / 200, -(b + 1) * bh, (sl * e.thick) / 100, bh * 0.8);
   }
 }
 
 export function renderGrid(ctx, W, H, t, e) {
-  const n = e.n;
-  const span = W * 0.8;
-  const cw = span / n;
-  const ch = (H * 0.5) / e.seg;
+  const n = e.n, span = W * 0.8, cw = span / n, ch = (H * 0.5) / e.seg;
   e._h = e._h || [];
   const row = [];
   for (let i = 0; i < n; i++) row.push(bv(e, i, n));
-  e._h.unshift(row);
-  if (e._h.length > e.seg) e._h.length = e.seg;
+  e._h.unshift(row); if (e._h.length > e.seg) e._h.length = e.seg;
   ctx.fillStyle = fillFor(ctx, e, -span / 2, -H * 0.25, span, H * 0.5, t);
   const a0 = ctx.globalAlpha;
-  e._h.forEach((r, y) => {
-    r.forEach((v, x) => {
-      ctx.globalAlpha = a0 * clamp(v, 0, 1);
-      ctx.fillRect(-span / 2 + x * cw, -H * 0.25 + y * ch, cw * 0.9, ch * 0.9);
-    });
-  });
+  e._h.forEach((r, y) => r.forEach((v, x) => {
+    ctx.globalAlpha = a0 * clamp(v, 0, 1);
+    ctx.fillRect(-span / 2 + x * cw, -H * 0.25 + y * ch, cw * 0.9, ch * 0.9);
+  }));
   ctx.globalAlpha = a0;
 }
