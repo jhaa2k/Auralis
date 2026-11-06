@@ -8,25 +8,67 @@ export default function ExportPanel() {
   const updateSettings = useStore((s) => s.updateSettings);
   const pushToast = useStore((s) => s.pushToast);
   const [recording, setRecording] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [outputUrl, setOutputUrl] = useState(null);
   const recRef = useRef(null);
 
   const formats = listFormats();
 
-  const startRec = () => {
+  const handleExport = async () => {
     const canvas = document.getElementById('cv');
     if (!canvas) return;
+    
+    // File System Access API
+    let dirHandle = null;
+    try {
+      if (!settings.exportDir && window.showDirectoryPicker) {
+        dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'downloads' });
+        pushToast('Folder access granted', 'ok');
+        // We can't store the handle in localStorage directly, but we can keep it in memory/IndexedDB if needed. 
+        // For simplicity, we'll just use it for this session.
+        window._exportDirHandle = dirHandle;
+      } else {
+        dirHandle = window._exportDirHandle;
+      }
+    } catch (err) {
+      pushToast('Export cancelled or permission denied', 'err');
+      return;
+    }
+
     if (!isPaused()) pause();
     play();
+    
+    setProgress(0);
     const rec = startRecord(
       canvas,
       settings,
-      (blob, name) => {
-        setOutputUrl(URL.createObjectURL(blob));
+      async (blob, name) => {
         setRecording(false);
-        pushToast('Export finished', 'ok');
+        setProgress(100);
+        
+        if (dirHandle) {
+          try {
+            const fileHandle = await dirHandle.getFileHandle(name, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            pushToast(`Saved to folder successfully`, 'ok');
+            return;
+          } catch (err) {
+            pushToast('Failed to save to folder. Downloading instead.', 'err');
+          }
+        }
+        
+        // Fallback
+        setOutputUrl(URL.createObjectURL(blob));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        a.click();
+        pushToast('Export downloaded', 'ok');
       },
-      (err) => { pushToast(err, 'err'); setRecording(false); }
+      (err) => { pushToast(err, 'err'); setRecording(false); },
+      (p) => setProgress(p) // Progress callback
     );
     if (rec) { recRef.current = rec; setRecording(true); pushToast('Recording started', 'ok'); }
   };
@@ -64,23 +106,30 @@ export default function ExportPanel() {
       <div style={{ background: 'var(--p2)', borderRadius: 'var(--r)', padding: '8px 14px', marginBottom: 8 }}>
         <Range label="Video Mbps" value={settings.mbps} min={1} max={40} step={1} onChange={(v) => updateSettings({ mbps: v })} />
         <Range label="Audio kbps" value={settings.abr} min={64} max={320} step={32} onChange={(v) => updateSettings({ abr: v })} />
-        <Range label="Start s" value={settings.t0} min={0} max={3600} step={1} onChange={(v) => updateSettings({ t0: v })} />
-        <Range label="End s (0=end)" value={settings.t1} min={0} max={3600} step={1} onChange={(v) => updateSettings({ t1: v })} />
       </div>
+      
+      {recording && (
+        <div style={{ marginBottom: 8 }}>
+          <progress value={progress} max="100" />
+          <div className="dm" style={{ textAlign: 'center' }}>{progress.toFixed(0)}%</div>
+        </div>
+      )}
+
       <div className="row" style={{ marginTop: 8 }}>
         {!recording ? (
-          <button className="pri" onClick={startRec}>Export</button>
+          <button className="pri" onClick={handleExport}>Export Video</button>
         ) : (
-          <button className="dg" onClick={stopRec}>Stop</button>
+          <button className="dg" onClick={stopRec}>Stop Recording</button>
         )}
       </div>
+      
       {outputUrl && (
         <div>
           <video controls src={outputUrl} style={{ width: '100%', borderRadius: 'var(--r)', marginTop: 8 }} />
-          <a className="btn" href={outputUrl} download="audiovis-export.webm" style={{ marginTop: 8 }}>Download</a>
+          <a className="btn" href={outputUrl} download="audiovis-export.webm" style={{ marginTop: 8 }}>Download manually</a>
         </div>
       )}
-      <div className="dm" style={{ marginTop: 8 }}>Export runs in real time with the real audio. Keep this tab open.</div>
+      <div className="dm" style={{ marginTop: 8 }}>Export runs in real-time. For the best quality, use a desktop browser.</div>
     </div>
   );
 }
@@ -89,10 +138,8 @@ function Range({ label, value, min, max, step, onChange }) {
   return (
     <div className="rg">
       <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(+e.target.value)} />
-      <input type="number" className="nm" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(+e.target.value)} />
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} />
+      <input type="number" className="nm" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} />
     </div>
   );
 }
