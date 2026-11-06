@@ -1,5 +1,5 @@
 import { useStore } from '../core/projectStore.js';
-import { SCENE_DEFAULTS } from '../core/constants.js';
+import { SCENE_DEFAULTS, SCENE_PRESETS } from '../core/constants.js';
 
 export default function ScenePanel() {
   const scene = useStore((s) => s.scene);
@@ -10,6 +10,17 @@ export default function ScenePanel() {
 
   return (
     <div>
+      <label className="f" style={{ marginBottom: 8 }}>
+        <span>Scene Preset</span>
+        <select onChange={(e) => {
+          const preset = SCENE_PRESETS[e.target.value];
+          if (preset) { setScene(preset); pushToast(`Applied ${e.target.value}`, 'ok'); }
+        }}>
+          <option value="">-- Custom --</option>
+          {Object.keys(SCENE_PRESETS).map((k) => <option key={k}>{k}</option>)}
+        </select>
+      </label>
+
       <div style={{ background: 'var(--p2)', borderRadius: 'var(--r)', padding: '8px 14px', marginBottom: 8 }}>
         <label className="cr">
           <span>Background</span>
@@ -25,7 +36,6 @@ export default function ScenePanel() {
         <Range label="Hue jump per beat" value={scene.hueB} min={0} max={90} step={1} onChange={(v) => set('hueB', v)} />
       </div>
       <button onClick={() => { setScene({ ...SCENE_DEFAULTS }); pushToast('Scene reset', 'ok'); }}>Reset scene</button>
-      <div className="dm">Camera zoom follows bass. These effects are part of the project and of the exported video.</div>
     </div>
   );
 }
@@ -34,10 +44,8 @@ function Range({ label, value, min, max, step, onChange }) {
   return (
     <div className="rg">
       <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(+e.target.value)} />
-      <input type="number" className="nm" min={min} max={max} step={step} value={value}
-        onChange={(e) => onChange(+e.target.value)} />
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} />
+      <input type="number" className="nm" min={min} max={max} step={step} value={value} onChange={(e) => onChange(+e.target.value)} />
     </div>
   );
 }
