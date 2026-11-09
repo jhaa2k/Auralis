@@ -3,7 +3,7 @@ name: Build Auralis Native Android
 on:
   workflow_dispatch:
   push:
-    branches: [ "native/kotlin-compose-foundation", "fix/android-sdk-ci" ]
+    branches: [ "native/kotlin-compose-foundation", "fix/android-sdk-ci", "fix/android-sdkmanager-path" ]
     paths:
       - "native-android/**"
       - ".github/workflows/build-native-android.yml"
@@ -28,13 +28,22 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # GitHub-hosted Ubuntu runners already include the Android SDK.
-      # Avoid android-actions/setup-android here: its legacy "tools"
-      # package request is no longer available from Google's SDK repository.
+      # Use the SDK command-line tools already installed on the hosted runner.
+      # Resolve sdkmanager explicitly because it is not guaranteed to be on PATH.
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            echo "Could not find sdkmanager under $SDK_ROOT/cmdline-tools"
+            find "$SDK_ROOT" -maxdepth 4 -type f -name sdkmanager -print || true
+            exit 1
+          fi
+          echo "Using SDK manager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
