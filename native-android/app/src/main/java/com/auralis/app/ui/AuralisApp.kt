@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -39,6 +41,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,13 +82,18 @@ fun AuralisApp() {
     var playbackPosition by remember { mutableLongStateOf(0L) }
     var playbackDuration by remember { mutableLongStateOf(0L) }
     var playerMessage by remember { mutableStateOf("CONNECTING TO AUDIO ENGINE") }
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
+
+    // These editor values are UI state. They will be connected to the render engine in a later phase.
+    var sensitivity by remember { mutableFloatStateOf(0.65f) }
+    var barCount by remember { mutableFloatStateOf(0.55f) }
+    var smoothing by remember { mutableFloatStateOf(0.35f) }
+    var glow by remember { mutableFloatStateOf(0.25f) }
+    var audioGain by remember { mutableFloatStateOf(0.70f) }
+    var layerOpacity by remember { mutableFloatStateOf(1f) }
 
     DisposableEffect(context) {
-        val token = SessionToken(
-            context,
-            ComponentName(context, AuralisPlaybackService::class.java)
-        )
+        val token = SessionToken(context, ComponentName(context, AuralisPlaybackService::class.java))
         val future = MediaController.Builder(context, token).buildAsync()
         var active = true
         future.addListener(
@@ -118,7 +127,7 @@ fun AuralisApp() {
                     playbackDuration = player.duration.coerceAtLeast(0L)
                     playerMessage = when (playbackState) {
                         Player.STATE_BUFFERING -> "BUFFERING"
-                        Player.STATE_READY -> if (playingOrPaused(player)) "PLAYING" else "READY"
+                        Player.STATE_READY -> if (player.isPlaying) "PLAYING" else "READY"
                         Player.STATE_ENDED -> "PLAYBACK COMPLETE"
                         else -> if (player.mediaItemCount == 0) "AUDIO ENGINE READY" else "READY"
                     }
@@ -142,13 +151,10 @@ fun AuralisApp() {
     LaunchedEffect(mediaController, selectedTrackUri, selectedTrackName) {
         val player = mediaController
         val uri = selectedTrackUri
-        val name = selectedTrackName
         if (player != null && uri != null) {
             val item = MediaItem.Builder()
                 .setUri(uri)
-                .setMediaMetadata(
-                    MediaMetadata.Builder().setTitle(name ?: "Unknown track").build()
-                )
+                .setMediaMetadata(MediaMetadata.Builder().setTitle(selectedTrackName ?: "Unknown track").build())
                 .build()
             player.setMediaItem(item)
             player.prepare()
@@ -164,15 +170,10 @@ fun AuralisApp() {
         }
     }
 
-    val audioPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
+    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             selectedTrackName = queryDisplayName(context, uri)
             selectedTrackUri = uri
@@ -195,16 +196,8 @@ fun AuralisApp() {
                     NavigationBarItem(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        icon = {
-                            Icon(
-                                icons[index],
-                                contentDescription = label,
-                                modifier = Modifier.size(19.dp)
-                            )
-                        },
-                        label = {
-                            Text(label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-                        }
+                        icon = { Icon(icons[index], contentDescription = label, modifier = Modifier.size(18.dp)) },
+                        label = { Text(label, fontSize = 9.sp, fontWeight = FontWeight.SemiBold) }
                     )
                 }
             }
@@ -215,179 +208,210 @@ fun AuralisApp() {
                 .fillMaxSize()
                 .padding(insets)
                 .background(StudioBlack)
-                .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "AURALIS",
-                    color = StudioWhite,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 2.sp
-                )
-                Spacer(Modifier.weight(1f))
-                Text("NATIVE / 0.2", color = StudioMuted, fontSize = 10.sp, letterSpacing = 1.sp)
-            }
-
-            Text("VISUALIZER WORKSPACE", color = StudioMuted, fontSize = 10.sp, letterSpacing = 1.5.sp)
-
-            Box(
+            // Upper 40%: fixed preview workspace.
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .background(
-                        Brush.linearGradient(listOf(StudioRaised, StudioBlack, StudioPanel)),
-                        RoundedCornerShape(4.dp)
-                    )
-                    .padding(1.dp),
-                contentAlignment = Alignment.Center
+                    .weight(0.40f)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Outlined.GraphicEq,
-                        contentDescription = null,
-                        tint = StudioAccent,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Text(
-                        "YOUR CANVAS",
-                        color = StudioWhite,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    )
-                    Text(
-                        if (selectedTrackName == null) "Import a track to start building"
-                        else "Track loaded • visualizer engine coming next",
-                        color = StudioMuted,
-                        fontSize = 11.sp
-                    )
+                    Text("AURALIS", color = StudioWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("PREVIEW  /  40%", color = StudioMuted, fontSize = 9.sp, letterSpacing = 1.sp)
                 }
-            }
-
-            Surface(
-                color = StudioPanel,
-                shape = RoundedCornerShape(4.dp),
-                border = BorderStroke(1.dp, StudioLine),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(
+                            Brush.linearGradient(listOf(StudioRaised, StudioBlack, StudioPanel)),
+                            RoundedCornerShape(3.dp)
+                        )
+                        .padding(1.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                selectedTrackName ?: "NO TRACK LOADED",
-                                color = StudioWhite,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                playerMessage,
-                                color = StudioMuted,
-                                fontSize = 9.sp,
-                                letterSpacing = 0.7.sp
-                            )
-                        }
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = StudioAccent, modifier = Modifier.size(38.dp))
+                        Text("LIVE PREVIEW", color = StudioWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                         Text(
-                            "${formatTime(playbackPosition)} / ${formatTime(playbackDuration)}",
+                            if (selectedTrackName == null) "Import audio to begin"
+                            else "Audio loaded • visualizer renderer pending",
                             color = StudioMuted,
                             fontSize = 10.sp
                         )
                     }
+                }
+            }
 
-                    Slider(
-                        value = if (playbackDuration > 0L) {
-                            playbackPosition.toFloat().coerceIn(0f, playbackDuration.toFloat())
-                        } else 0f,
-                        onValueChange = { value ->
-                            playbackPosition = value.toLong()
-                        },
-                        onValueChangeFinished = {
-                            if (playbackDuration > 0L) {
-                                mediaController?.seekTo(playbackPosition)
+            // Lower 60%: playback, editor categories and scrollable properties.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.60f)
+                    .background(StudioPanel, RoundedCornerShape(3.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            ) {
+                Text("CONTROLS & PROPERTIES  /  60%", color = StudioMuted, fontSize = 9.sp, letterSpacing = 1.2.sp)
+                Spacer(Modifier.height(7.dp))
+
+                Surface(
+                    color = StudioBlack,
+                    shape = RoundedCornerShape(3.dp),
+                    border = BorderStroke(1.dp, StudioLine),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(horizontal = 9.dp, vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    selectedTrackName ?: "NO TRACK LOADED",
+                                    color = StudioWhite,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(playerMessage, color = StudioMuted, fontSize = 8.sp)
                             }
-                        },
-                        valueRange = 0f..(playbackDuration.coerceAtLeast(1L).toFloat()),
-                        enabled = mediaController != null && playbackDuration > 0L
-                    )
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = { audioPicker.launch(arrayOf("audio/*")) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = StudioAccent,
-                                contentColor = StudioBlack
-                            ),
-                            shape = RoundedCornerShape(4.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                Icons.Outlined.AudioFile,
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp)
-                            )
-                            Text("  IMPORT AUDIO", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("${formatTime(playbackPosition)} / ${formatTime(playbackDuration)}", color = StudioMuted, fontSize = 9.sp)
                         }
+                        Slider(
+                            value = if (playbackDuration > 0L) playbackPosition.toFloat().coerceIn(0f, playbackDuration.toFloat()) else 0f,
+                            onValueChange = { playbackPosition = it.toLong() },
+                            onValueChangeFinished = { if (playbackDuration > 0L) mediaController?.seekTo(playbackPosition) },
+                            valueRange = 0f..playbackDuration.coerceAtLeast(1L).toFloat(),
+                            enabled = mediaController != null && playbackDuration > 0L
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = { audioPicker.launch(arrayOf("audio/*")) },
+                                colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack),
+                                shape = RoundedCornerShape(3.dp),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Icon(Icons.Outlined.AudioFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text("  IMPORT AUDIO", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Button(
+                                onClick = {
+                                    mediaController?.let { player ->
+                                        if (player.isPlaying) player.pause()
+                                        else if (player.mediaItemCount > 0) player.play()
+                                    }
+                                },
+                                enabled = (mediaController?.mediaItemCount ?: 0) > 0,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = StudioRaised,
+                                    contentColor = StudioWhite,
+                                    disabledContainerColor = StudioRaised,
+                                    disabledContentColor = StudioMuted
+                                ),
+                                shape = RoundedCornerShape(3.dp),
+                                modifier = Modifier.height(38.dp)
+                            ) {
+                                Icon(if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(17.dp))
+                                Text(if (isPlaying) " PAUSE" else " PLAY", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
 
-                        Button(
-                            onClick = {
-                                mediaController?.let { player ->
-                                    if (player.isPlaying) player.pause()
-                                    else if (player.mediaItemCount > 0) player.play()
-                                }
-                            },
-                            enabled = (mediaController?.mediaItemCount ?: 0) > 0,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = StudioRaised,
-                                contentColor = StudioWhite,
-                                disabledContainerColor = StudioRaised,
-                                disabledContentColor = StudioMuted
-                            ),
-                            shape = RoundedCornerShape(4.dp)
-                        ) {
-                            Icon(
-                                if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
-                                contentDescription = if (isPlaying) "Pause" else "Play",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Text(
-                                if (isPlaying) " PAUSE" else " PLAY",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        listOf("STUDIO PROPERTIES", "LAYER PROPERTIES", "AUDIO PROPERTIES", "APP SETTINGS")[selectedTab],
+                        color = StudioWhite,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text("EDIT PANEL", color = StudioMuted, fontSize = 8.sp)
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    when (selectedTab) {
+                        0 -> {
+                            PropertySlider("Sensitivity", sensitivity, { sensitivity = it }, "LOW", "HIGH", "${(sensitivity * 100).toInt()}%")
+                            PropertySlider("Bar count", barCount, { barCount = it }, "FEWER", "MORE", "${(12 + barCount * 116).toInt()}")
+                            PropertySlider("Smoothing", smoothing, { smoothing = it }, "FAST", "SMOOTH", "${(smoothing * 100).toInt()}%")
+                            PropertySlider("Glow intensity", glow, { glow = it }, "0", "MAX", "${(glow * 100).toInt()}%")
+                            Text("Visualizer controls are prepared for the upcoming FFT/OpenGL engine connection.", color = StudioMuted, fontSize = 8.sp)
+                        }
+                        1 -> {
+                            PropertySlider("Selected layer opacity", layerOpacity, { layerOpacity = it }, "0%", "100%", "${(layerOpacity * 100).toInt()}%")
+                            PropertyInfoRow("Layer stack", "Background  •  Visualizer  •  Text")
+                            PropertyInfoRow("Layer actions", "Add / duplicate / delete — next phase")
+                        }
+                        2 -> {
+                            PropertySlider("Audio gain", audioGain, { audioGain = it }, "QUIET", "LOUD", "${(audioGain * 100).toInt()}%")
+                            PropertyInfoRow("Playback engine", "Media3 ExoPlayer")
+                            PropertyInfoRow("Track source", selectedTrackName ?: "No audio selected")
+                        }
+                        else -> {
+                            PropertyInfoRow("Interface", "Monochrome studio")
+                            PropertyInfoRow("Preview layout", "40% preview / 60% controls")
+                            PropertyInfoRow("Rendering", "OpenGL ES — planned")
+                            PropertyInfoRow("Video export", "MediaCodec / MediaMuxer — planned")
                         }
                     }
                 }
             }
-
-            Text(
-                "MEDIA3 PLAYBACK  •  ANDROID DOCUMENT PICKER",
-                color = StudioMuted,
-                fontSize = 9.sp,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
         }
     }
 }
 
-private fun queryDisplayName(
-    context: android.content.Context,
-    uri: Uri
-): String {
+@Composable
+private fun PropertySlider(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    startLabel: String,
+    endLabel: String,
+    valueLabel: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = StudioWhite, fontSize = 10.sp)
+            Spacer(Modifier.weight(1f))
+            Text(valueLabel, color = StudioAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+        }
+        Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f)
+        Row {
+            Text(startLabel, color = StudioMuted, fontSize = 7.sp)
+            Spacer(Modifier.weight(1f))
+            Text(endLabel, color = StudioMuted, fontSize = 7.sp)
+        }
+    }
+}
+
+@Composable
+private fun PropertyInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(StudioBlack, RoundedCornerShape(2.dp)).padding(horizontal = 8.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = StudioMuted, fontSize = 9.sp)
+        Spacer(Modifier.weight(1f))
+        Text(value, color = StudioWhite, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private fun queryDisplayName(context: android.content.Context, uri: Uri): String {
     val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
     return runCatching {
         context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
@@ -400,10 +424,6 @@ private fun queryDisplayName(
 }
 
 private fun formatTime(milliseconds: Long): String {
-    val totalSeconds = (milliseconds.coerceAtLeast(0L) / 1000L)
-    val minutes = totalSeconds / 60L
-    val seconds = totalSeconds % 60L
-    return String.format(Locale.US, "%02d:%02d", minutes, seconds)
+    val totalSeconds = milliseconds.coerceAtLeast(0L) / 1000L
+    return String.format(Locale.US, "%02d:%02d", totalSeconds / 60L, totalSeconds % 60L)
 }
-
-private fun playingOrPaused(player: Player): Boolean = player.isPlaying
