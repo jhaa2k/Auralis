@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import './ui/refined.css';
 import Header from './ui/Header.jsx';
 import Stage from './ui/Stage.jsx';
 import Transport from './ui/Transport.jsx';

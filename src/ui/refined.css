@@ -1,0 +1,121 @@
+/* Auralis refined studio UI — additive overrides, preserving existing controls. */
+:root {
+  --r: 4px;
+  --r2: 8px;
+  --nav-h: 56px;
+  --hdr-h: 50px;
+  --p2: color-mix(in srgb, var(--pn), var(--tx) 5%);
+}
+
+#app { isolation: isolate; }
+header {
+  border-bottom: 1px solid color-mix(in srgb, var(--ln), transparent 25%);
+}
+.logo { letter-spacing: .075em; font-size: 13px; }
+.ib { border-radius: 4px; }
+.ib:focus-visible, nav button:focus-visible { outline-offset: -2px; }
+
+.cvw { padding: 8px 10px; }
+#cv {
+  border: 1px solid color-mix(in srgb, var(--ln), transparent 25%);
+  border-radius: 4px;
+}
+.hud { top: 14px; left: 16px; right: 16px; }
+.hud span {
+  border: 1px solid #ffffff20;
+  border-radius: 3px;
+  padding: 4px 7px;
+  letter-spacing: .1em;
+}
+
+.tp { padding: 6px 12px 8px; gap: 7px; }
+.wfw { border: 1px solid var(--ln); border-radius: 3px; }
+.tr2 button { border-radius: 4px; }
+#pl { border-radius: 6px; }
+
+nav {
+  border-top: 1px solid var(--ln);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+nav button {
+  min-height: var(--nav-h);
+  gap: 3px;
+  transition: color .15s ease, background .15s ease;
+}
+nav button.on {
+  background: color-mix(in srgb, var(--ac) 7%, transparent);
+}
+nav button.on::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: 2px;
+  background: var(--ac);
+}
+
+#sb {
+  scrollbar-width: none;
+  padding: 8px 12px 20px;
+}
+#sb::-webkit-scrollbar { display: none; }
+details, .it, .rl, .btn { border-radius: 4px; }
+details { border: 1px solid color-mix(in srgb, var(--ln), transparent 35%); }
+summary { min-height: 44px; padding: 11px 12px; }
+details > div { padding: 0 12px 12px; }
+.it.sl { border-color: color-mix(in srgb, var(--ac) 55%, transparent); }
+input[type=range]::-webkit-slider-runnable-track { height: 2px; }
+input[type=range]::-webkit-slider-thumb {
+  width: 13px; height: 13px; margin-top: -5.5px; border-radius: 2px;
+}
+input[type=range]::-moz-range-track { height: 2px; }
+input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border-radius: 2px; }
+input[type=checkbox] { border-radius: 3px; }
+input[type=checkbox]::after { border-radius: 2px; }
+
+body:not(.wide) aside {
+  height: min(58%, 560px);
+  max-height: 58%;
+  border-radius: 0;
+  border-top: 1px solid var(--ln);
+  box-shadow: 0 -14px 36px #0009;
+}
+body:not(.wide) aside.open::before {
+  width: 34px;
+  height: 3px;
+  border-radius: 0;
+  background: var(--dm);
+  opacity: .7;
+}
+body:not(.wide) aside.open .sh {
+  padding-top: 12px;
+}
+
+.wide aside {
+  width: clamp(340px, 32vw, 420px);
+  flex-basis: clamp(340px, 32vw, 420px);
+}
+.wide .cvw { padding: 12px; }
+.wide .stage { min-width: 0; }
+
+button, .it, details, input, select { transition-duration: .14s; }
+button:active { transform: translateY(1px); }
+:focus-visible { outline-offset: 2px; }
+
+@media (max-width: 360px) {
+  header { padding-left: 10px; padding-right: 6px; }
+  .logo { font-size: 12px; }
+  .ib { width: 32px; }
+  nav button { font-size: 8px; }
+  .rg { grid-template-columns: 76px minmax(0,1fr) 50px; gap: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
