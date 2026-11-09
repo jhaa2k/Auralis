@@ -99,8 +99,7 @@ fun AuralisApp() {
         )
         onDispose {
             active = false
-            future.cancel(false)
-            mediaController?.release()
+            MediaController.releaseFuture(future)
             mediaController = null
         }
     }
@@ -351,7 +350,7 @@ fun AuralisApp() {
                                     else if (player.mediaItemCount > 0) player.play()
                                 }
                             },
-                            enabled = mediaController != null && mediaController?.mediaItemCount ?: 0 > 0,
+                            enabled = (mediaController?.mediaItemCount ?: 0) > 0,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = StudioRaised,
                                 contentColor = StudioWhite,
