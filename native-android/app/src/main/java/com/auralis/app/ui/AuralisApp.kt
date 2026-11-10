@@ -286,6 +286,9 @@ fun AuralisApp() {
                             scale = barsLayer?.scale ?: 1f,
                             rotation = barsLayer?.rotation ?: 0f
                         ),
+                        audioGain = 0.1f + audioGain * 3.9f,
+                        lowFrequencyFraction = fftLower,
+                        highFrequencyFraction = fftUpper,
                         modifier = Modifier.fillMaxSize()
                     )
                     if (selectedTrackName == null) {
@@ -477,6 +480,9 @@ private fun LiveVisualizerPreview(
     audioSessionId: Int,
     hasAudioPermission: Boolean,
     settings: VisualizerSettings,
+    audioGain: Float,
+    lowFrequencyFraction: Float,
+    highFrequencyFraction: Float,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -488,8 +494,13 @@ private fun LiveVisualizerPreview(
         modifier = modifier
     )
 
-    DisposableEffect(surface, audioSessionId, hasAudioPermission, settings.smoothing) {
-        val capture = VisualizerCapture(smoothing = settings.smoothing) { values ->
+    DisposableEffect(surface, audioSessionId, hasAudioPermission, settings.smoothing, audioGain, lowFrequencyFraction, highFrequencyFraction) {
+        val capture = VisualizerCapture(
+            smoothing = settings.smoothing,
+            gain = audioGain,
+            lowFrequencyFraction = lowFrequencyFraction,
+            highFrequencyFraction = highFrequencyFraction
+        ) { values ->
             surface.submitSpectrum(values)
         }
         if (hasAudioPermission && audioSessionId > 0) capture.start(audioSessionId)
