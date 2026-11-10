@@ -33,7 +33,10 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var program = 0
     private var positionHandle = 0
     private var colorHandle = 0
+    private var pointSizeHandle = 0
+    private var roundPointHandle = 0
     private var vertexBuffer: FloatBuffer? = null
+    private var particleBuffer: FloatBuffer? = null
     private val vertexCapacity = 128 * 24 * 6
 
     fun submit(values: FloatArray) {
@@ -50,20 +53,29 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             attribute vec2 aPosition;
             attribute vec4 aColor;
             varying vec4 vColor;
+            uniform float uPointSize;
             void main() {
                 gl_Position = vec4(aPosition, 0.0, 1.0);
+                gl_PointSize = uPointSize;
                 vColor = aColor;
             }
         """.trimIndent()
         val fragmentShader = """
             precision mediump float;
             varying vec4 vColor;
-            void main() { gl_FragColor = vColor; }
+            uniform float uRoundPoint;
+            void main() {
+                if (uRoundPoint > 0.5 && distance(gl_PointCoord, vec2(0.5, 0.5)) > 0.5) discard;
+                gl_FragColor = vColor;
+            }
         """.trimIndent()
         program = linkProgram(compileShader(GLES20.GL_VERTEX_SHADER, vertexShader), compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentShader))
         positionHandle = GLES20.glGetAttribLocation(program, "aPosition")
         colorHandle = GLES20.glGetAttribLocation(program, "aColor")
+        pointSizeHandle = GLES20.glGetUniformLocation(program, "uPointSize")
+        roundPointHandle = GLES20.glGetUniformLocation(program, "uRoundPoint")
         vertexBuffer = ByteBuffer.allocateDirect(vertexCapacity * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        particleBuffer = ByteBuffer.allocateDirect(400 * 6 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
@@ -139,7 +151,38 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         buffer.position(2)
         GLES20.glEnableVertexAttribArray(colorHandle)
         GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, buffer)
+        GLES20.glUniform1f(roundPointHandle, 0f)
+        GLES20.glUniform1f(pointSizeHandle, 1f)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, offset / 6)
+
+        if (config.particlesEnabled && config.particleCount > 0) {
+            val points = particleBuffer ?: return
+            points.clear()
+            val now = System.nanoTime() / 1_000_000_000.0
+            val energy = data.average().coerceIn(0f, 1f)
+            for (i in 0 until config.particleCount) {
+                val seed = i.toFloat()
+                val phase = ((now * config.particleSpeed * 0.12 + seed * 0.6180339) % 1.0).toFloat()
+                val angle = seed * 2.3999632f
+                val radial = (0.12f + ((seed * 0.7548776f) % 1f) * config.particleSpread) * (0.65f + energy * 0.75f)
+                val x = (cos(angle + now.toFloat() * 0.10f * config.particleSpeed) * radial).coerceIn(-0.98f, 0.98f)
+                val y = (phase * 2f - 1f + sin(angle * 1.7f + now.toFloat() * 0.4f) * 0.08f).coerceIn(-0.98f, 0.98f)
+                val alpha = (config.opacity * (0.30f + energy * 0.70f) * (0.45f + ((seed * 0.31f) % 0.55f))).coerceIn(0f, 1f)
+                points.put(x)
+                points.put(y)
+                points.put(0.48f + energy * 0.30f)
+                points.put(0.78f + energy * 0.18f)
+                points.put(1f)
+                points.put(alpha)
+            }
+            points.position(0)
+            GLES20.glUniform1f(roundPointHandle, 1f)
+            GLES20.glUniform1f(pointSizeHandle, config.particleSize)
+            GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 24, points)
+            points.position(2)
+            GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, points)
+            GLES20.glDrawArrays(GLES20.GL_POINTS, 0, config.particleCount)
+        }
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisableVertexAttribArray(colorHandle)
     }
