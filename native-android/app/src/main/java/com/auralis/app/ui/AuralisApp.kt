@@ -77,6 +77,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.auralis.app.audio.AudioSessionBridge
 import com.auralis.app.playback.AuralisPlaybackService
+import com.auralis.app.visualizer.MeasureWhat
 import com.auralis.app.visualizer.VisualizerCapture
 import com.auralis.app.visualizer.VisualizerSettings
 import com.auralis.app.visualizer.VisualizerSurface
@@ -312,7 +313,11 @@ fun AuralisApp() {
                             particleCount = (20 + particleCount * 380).toInt(),
                             particleSpeed = 0.1f + particleSpeed * 3.9f,
                             particleSize = 1f + particleSize * 11f,
-                            particleSpread = 0.1f + particleSpread * 1.9f
+                            particleSpread = 0.1f + particleSpread * 1.9f,
+                            positionMeasure = barsLayer?.positionMeasure ?: MeasureWhat.NOTHING,
+                            scaleMeasure = barsLayer?.scaleMeasure ?: MeasureWhat.NOTHING,
+                            rotationMeasure = barsLayer?.rotationMeasure ?: MeasureWhat.NOTHING,
+                            measureAmount = barsLayer?.measureAmount ?: 0.5f
                         ),
                         audioGain = 0.1f + audioGain * 3.9f,
                         lowFrequencyFraction = fftLower,
@@ -495,6 +500,14 @@ fun AuralisApp() {
                                 PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%")
                                 PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale))
                                 PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°")
+                                if (selected.type == "Bars" || selected.type == "Particles") {
+                                    Text("AUDIO / TIME MODULATION", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    MeasureDropdown("Position · Measure What", selected.positionMeasure) { editorLayers[selectedIndex] = selected.copy(positionMeasure = it) }
+                                    MeasureDropdown("Scale · Measure What", selected.scaleMeasure) { editorLayers[selectedIndex] = selected.copy(scaleMeasure = it) }
+                                    MeasureDropdown("Rotation · Measure What", selected.rotationMeasure) { editorLayers[selectedIndex] = selected.copy(rotationMeasure = it) }
+                                    PropertySlider("Measure amount", selected.measureAmount, { editorLayers[selectedIndex] = selected.copy(measureAmount = it) }, "SUBTLE", "STRONG", "${(selected.measureAmount * 100).toInt()}%")
+                                    PropertyInfoRow("Beat detection", "Bass FFT onset / live")
+                                }
                                 if (selected.type == "Particles") {
                                     PropertySlider("Particle count", particleCount, { particleCount = it }, "20", "400", "${(20 + particleCount * 380).toInt()}")
                                     PropertySlider("Movement speed", particleSpeed, { particleSpeed = it }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", 0.1f + particleSpeed * 3.9f))
@@ -627,6 +640,39 @@ private fun LiveVisualizerPreview(
 }
 
 @Composable
+private fun MeasureDropdown(
+    label: String,
+    selected: MeasureWhat,
+    onSelected: (MeasureWhat) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, color = StudioMuted, fontSize = 8.sp)
+        Box {
+            Button(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = StudioBlack, contentColor = StudioWhite),
+                shape = RoundedCornerShape(2.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 5.dp)
+            ) {
+                Text(selected.label, fontSize = 9.sp)
+                Spacer(Modifier.weight(1f))
+                Text("▾", color = StudioAccent, fontSize = 10.sp)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                MeasureWhat.values().forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.label, fontSize = 10.sp) },
+                        onClick = { onSelected(option); expanded = false }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PropertySlider(
     label: String,
     value: Float,
@@ -670,7 +716,11 @@ private data class EditorLayer(
     val textContent: String = "{ArtistOrTitle}",
     val fontSize: Float = 30f,
     val textColor: Long = 0xFFFFFFFF,
-    val imageUri: String? = null
+    val imageUri: String? = null,
+    val positionMeasure: MeasureWhat = MeasureWhat.NOTHING,
+    val scaleMeasure: MeasureWhat = MeasureWhat.NOTHING,
+    val rotationMeasure: MeasureWhat = MeasureWhat.NOTHING,
+    val measureAmount: Float = 0.5f
 )
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String {
