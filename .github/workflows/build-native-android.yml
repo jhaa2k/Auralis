@@ -3,7 +3,7 @@ name: Build Auralis Native Android
 on:
   workflow_dispatch:
   push:
-    branches: [ "native/kotlin-compose-foundation", "fix/android-sdk-ci", "fix/android-sdkmanager-path" ]
+    branches: [ "native/kotlin-compose-foundation", "fix/android-sdk-ci", "fix/android-sdkmanager-path", "feature/ultimate-visualizer-engine" ]
     paths:
       - "native-android/**"
       - ".github/workflows/build-native-android.yml"
