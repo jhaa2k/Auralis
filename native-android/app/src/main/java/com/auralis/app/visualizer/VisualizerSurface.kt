@@ -38,6 +38,10 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var vertexBuffer: FloatBuffer? = null
     private var particleBuffer: FloatBuffer? = null
     private val vertexCapacity = 128 * 24 * 6
+    private val rendererStartNanos = System.nanoTime()
+    private var previousBassEnergy = 0f
+    private var beatPulse = 0f
+    private var lastBeatNanos = 0L
 
     fun submit(values: FloatArray) {
         spectrum = values.copyOf()
@@ -94,6 +98,25 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val slot = 2f / count
         val barWidth = max(0.001f, slot - gap)
         val data = spectrum
+        val nowNanos = System.nanoTime()
+        val elapsedSeconds = ((nowNanos - rendererStartNanos) / 1_000_000_000.0).toFloat()
+        val bassBins = min(12, data.size)
+        val bassEnergy = if (bassBins > 0) data.take(bassBins).average().toFloat() else 0f
+        if (bassEnergy > 0.10f && bassEnergy > previousBassEnergy * 1.32f && nowNanos - lastBeatNanos > 180_000_000L) {
+            beatPulse = 1f
+            lastBeatNanos = nowNanos
+        } else {
+            beatPulse *= 0.88f
+        }
+        previousBassEnergy = previousBassEnergy * 0.72f + bassEnergy * 0.28f
+        val positionSignal = measureSignal(config.positionMeasure, elapsedSeconds, data.average().toFloat(), beatPulse)
+        val scaleSignal = measureSignal(config.scaleMeasure, elapsedSeconds, data.average().toFloat(), beatPulse)
+        val rotationSignal = measureSignal(config.rotationMeasure, elapsedSeconds, data.average().toFloat(), beatPulse)
+        val amount = config.measureAmount
+        val effectivePositionX = (config.positionX + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
+        val effectivePositionY = (config.positionY + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
+        val effectiveScale = (config.scale * (1f + (scaleSignal - 0.5f) * amount)).coerceIn(0.1f, 3f)
+        val effectiveRotation = config.rotation + (rotationSignal - 0.5f) * amount * 90f
         val vertices = FloatArray(count * 24 * 6)
         var offset = 0
         for (i in 0 until count) {
@@ -114,14 +137,14 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     left,bottom, right,bottom, right,top,
                     left,bottom, right,top, left,top
                 )
-                val angle = Math.toRadians(config.rotation.toDouble())
+                val angle = Math.toRadians(effectiveRotation.toDouble())
                 val cosine = cos(angle).toFloat()
                 val sine = sin(angle).toFloat()
-                val centerX = (config.positionX - 0.5f) * 2f
-                val centerY = (0.5f - config.positionY) * 2f
+                val centerX = (effectivePositionX - 0.5f) * 2f
+                val centerY = (0.5f - effectivePositionY) * 2f
                 for (p in 0 until 6) {
-                    val localX = points[p * 2] * config.scale
-                    val localY = points[p * 2 + 1] * config.scale
+                    val localX = points[p * 2] * effectiveScale
+                    val localY = points[p * 2 + 1] * effectiveScale
                     val rotatedX = localX * cosine - localY * sine + centerX
                     val rotatedY = localX * sine + localY * cosine + centerY
                     vertices[offset++] = rotatedX
@@ -185,6 +208,25 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         }
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisableVertexAttribArray(colorHandle)
+    }
+
+    private fun measureSignal(what: MeasureWhat, elapsed: Float, energy: Float, beat: Float): Float {
+        val phase = elapsed * 0.7f
+        return when (what) {
+            MeasureWhat.NOTHING -> 0.5f
+            MeasureWhat.BEAT -> 0.5f + beat * 0.5f
+            MeasureWhat.TOTAL_TIME -> (elapsed * 0.25f) % 1f
+            MeasureWhat.TOTAL_TIME_BACKWARD -> 1f - ((elapsed * 0.25f) % 1f)
+            MeasureWhat.TOTAL_TIME_WHEN_PLAYING -> if (energy > 0.015f) (elapsed * 0.25f) % 1f else 0.5f
+            MeasureWhat.TOTAL_TIME_AND_BEAT -> (((elapsed * 0.25f) % 1f) * 0.65f + beat * 0.35f).coerceIn(0f, 1f)
+            MeasureWhat.TRACK_POSITION -> 0.5f
+            MeasureWhat.BEAT_RANDOM_SHAKE -> 0.5f + beat * sin(elapsed * 37f) * 0.5f
+            MeasureWhat.BEAT_CAM_SHAKE_ROT_MORE -> 0.5f + beat * 0.5f
+            MeasureWhat.BEAT_CAM_SHAKE_ROT_LESS -> 0.5f - beat * 0.5f
+            MeasureWhat.CONSTANT_SHAKE_ROT_MORE -> 0.5f + sin(phase * 19f) * 0.5f
+            MeasureWhat.CONSTANT_SHAKE_ROT_LESS -> 0.5f - sin(phase * 19f) * 0.5f
+            MeasureWhat.BEAT_TRIGGER_ANIM -> 0.5f + beat * 0.5f
+        }.coerceIn(0f, 1f)
     }
 
     private fun compileShader(type: Int, source: String): Int {
