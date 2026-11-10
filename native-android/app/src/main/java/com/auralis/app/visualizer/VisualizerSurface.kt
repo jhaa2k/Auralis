@@ -205,7 +205,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val points = particleBuffer ?: return
             points.clear()
             val now = System.nanoTime() / 1_000_000_000.0
-            val energy = data.average().coerceIn(0f, 1f)
+            val energy = data.average().toFloat().coerceIn(0f, 1f)
             val particlePositionSignal = measureSignal(config.particlePositionMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
             val particleScaleSignal = measureSignal(config.particleScaleMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
             val particleRotationSignal = measureSignal(config.particleRotationMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
@@ -221,8 +221,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val phase = ((now * config.particleSpeed * 0.12 + seed * 0.6180339) % 1.0).toFloat()
                 val angle = seed * 2.3999632f
                 val radial = (0.12f + ((seed * 0.7548776f) % 1f) * config.particleSpread) * (0.65f + energy * 0.75f)
-                val baseX = cos(angle + now.toFloat() * 0.10f * config.particleSpeed) * radial
-                val baseY = phase * 2f - 1f + sin(angle * 1.7f + now.toFloat() * 0.4f) * 0.08f
+                val baseX = cos((angle + now.toFloat() * 0.10f * config.particleSpeed).toDouble()).toFloat() * radial
+                val baseY = phase * 2f - 1f + sin((angle * 1.7f + now.toFloat() * 0.4f).toDouble()).toFloat() * 0.08f
                 val localX = baseX * particleScale
                 val localY = baseY * particleScale
                 val x = (localX * particleCos - localY * particleSin + particleXOffset).coerceIn(-1.2f, 1.2f)
