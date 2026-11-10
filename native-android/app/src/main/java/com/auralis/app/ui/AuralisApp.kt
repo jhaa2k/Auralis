@@ -225,6 +225,7 @@ fun AuralisApp() {
                     Icons.Outlined.GraphicEq,
                     Icons.Outlined.Layers,
                     Icons.Outlined.AudioFile,
+                    Icons.Outlined.GraphicEq,
                     Icons.Outlined.Settings
                 )
                 tabs.forEachIndexed { index, label ->
