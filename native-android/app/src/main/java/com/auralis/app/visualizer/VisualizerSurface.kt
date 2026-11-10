@@ -9,6 +9,8 @@ import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.max
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.math.min
 
 class VisualizerSurface(context: Context) : GLSurfaceView(context) {
@@ -100,9 +102,18 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     left,bottom, right,bottom, right,top,
                     left,bottom, right,top, left,top
                 )
+                val angle = Math.toRadians(config.rotation.toDouble())
+                val cosine = cos(angle).toFloat()
+                val sine = sin(angle).toFloat()
+                val centerX = (config.positionX - 0.5f) * 2f
+                val centerY = (0.5f - config.positionY) * 2f
                 for (p in 0 until 6) {
-                    vertices[offset++] = points[p * 2]
-                    vertices[offset++] = points[p * 2 + 1]
+                    val localX = points[p * 2] * config.scale
+                    val localY = points[p * 2 + 1] * config.scale
+                    val rotatedX = localX * cosine - localY * sine + centerX
+                    val rotatedY = localX * sine + localY * cosine + centerY
+                    vertices[offset++] = rotatedX
+                    vertices[offset++] = rotatedY
                     vertices[offset++] = red
                     vertices[offset++] = green
                     vertices[offset++] = blue
