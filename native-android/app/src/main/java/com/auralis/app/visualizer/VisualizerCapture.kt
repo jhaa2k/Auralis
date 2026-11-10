@@ -10,6 +10,7 @@ import kotlin.math.pow
  * Android requires RECORD_AUDIO permission for the Visualizer API.
  */
 class VisualizerCapture(
+    private val smoothing: Float = 0.35f,
     private val onSpectrum: (FloatArray) -> Unit
 ) {
     private var visualizer: Visualizer? = null
@@ -53,7 +54,10 @@ class VisualizerCapture(
                             }
                             result[bar] = (ln(1f + peak * 8f) / ln(9f)).coerceIn(0f, 1f)
                         }
-                        onSpectrum(result)
+                        for (i in result.indices) {
+                            smoothed[i] = smoothed[i] * smoothing.coerceIn(0f, 0.95f) + result[i] * (1f - smoothing.coerceIn(0f, 0.95f))
+                        }
+                        onSpectrum(smoothed.copyOf())
                     }
                 },
                 Visualizer.getMaxCaptureRate(),
