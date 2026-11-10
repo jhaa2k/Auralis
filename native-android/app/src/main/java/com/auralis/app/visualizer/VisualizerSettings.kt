@@ -20,7 +20,8 @@ data class VisualizerSettings(
     val scaleMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val rotationMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val measureAmount: Float = 0.5f,
-    val trackPositionFraction: Float = 0f
+    val trackPositionFraction: Float = 0f,
+    val beatSensitivity: Float = 0.55f
 ) {
     fun sanitized() = copy(
         barCount = barCount.coerceIn(16, 128),
@@ -37,6 +38,7 @@ data class VisualizerSettings(
         particleSize = particleSize.coerceIn(1f, 12f),
         particleSpread = particleSpread.coerceIn(0.1f, 2f),
         measureAmount = measureAmount.coerceIn(0f, 1f),
-        trackPositionFraction = trackPositionFraction.coerceIn(0f, 1f)
+        trackPositionFraction = trackPositionFraction.coerceIn(0f, 1f),
+        beatSensitivity = beatSensitivity.coerceIn(0f, 1f)
     )
 }
