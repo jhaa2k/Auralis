@@ -1,6 +1,7 @@
 package com.auralis.app.ui
 
 import android.Manifest
+import android.graphics.BitmapFactory
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
@@ -23,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -56,6 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
@@ -84,6 +88,8 @@ import com.auralis.app.ui.theme.StudioPanel
 import com.auralis.app.ui.theme.StudioRaised
 import com.auralis.app.ui.theme.StudioWhite
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 @Composable
@@ -217,6 +223,14 @@ fun AuralisApp() {
         }
     }
 
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            val index = editorLayers.indexOfFirst { it.id == selectedLayerId }
+            if (index >= 0) editorLayers[index] = editorLayers[index].copy(imageUri = uri.toString())
+        }
+    }
+
     val barsLayer = editorLayers.firstOrNull { it.type == "Bars" }
 
     Scaffold(
@@ -309,6 +323,17 @@ fun AuralisApp() {
                                     scaleY = textLayer.scale
                                     rotationZ = textLayer.rotation
                                 }
+                        )
+                    }
+                    editorLayers.filter { it.type == "Image" && it.visible && it.imageUri != null }.forEach { imageLayer ->
+                        LayerImagePreview(
+                            uri = Uri.parse(imageLayer.imageUri),
+                            opacity = imageLayer.opacity,
+                            x = imageLayer.x,
+                            y = imageLayer.y,
+                            scale = imageLayer.scale,
+                            rotation = imageLayer.rotation,
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                     if (selectedTrackName == null) {
@@ -460,6 +485,15 @@ fun AuralisApp() {
                                 PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%")
                                 PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale))
                                 PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°")
+                                if (selected.type == "Image") {
+                                    Button(
+                                        onClick = { imagePicker.launch(arrayOf("image/*")) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack),
+                                        shape = RoundedCornerShape(2.dp)
+                                    ) { Text(if (selected.imageUri == null) "CHOOSE IMAGE" else "REPLACE IMAGE", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                                    PropertyInfoRow("Image source", if (selected.imageUri == null) "No image selected" else "Device image / loaded")
+                                    Text("Image is rendered in the live preview with layer transforms.", color = StudioMuted, fontSize = 8.sp)
+                                }
                                 if (selected.type == "Text") {
                                     Text("TEXT CONTENT", color = StudioMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                                     BasicTextField(
@@ -503,6 +537,41 @@ fun AuralisApp() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LayerImagePreview(
+    uri: Uri,
+    opacity: Float,
+    x: Float,
+    y: Float,
+    scale: Float,
+    rotation: Float,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val bitmap by androidx.compose.runtime.produceState<android.graphics.Bitmap?>(initialValue = null, uri) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+            }.getOrNull()
+        }
+    }
+    bitmap?.let { decoded ->
+        Image(
+            bitmap = decoded.asImageBitmap(),
+            contentDescription = "Visualizer image layer",
+            contentScale = ContentScale.Fit,
+            modifier = modifier.graphicsLayer {
+                alpha = opacity
+                translationX = (x - 0.5f) * size.width
+                translationY = (y - 0.5f) * size.height
+                scaleX = scale
+                scaleY = scale
+                rotationZ = rotation
+            }
+        )
     }
 }
 
@@ -582,7 +651,8 @@ private data class EditorLayer(
     val scale: Float = 1f, val rotation: Float = 0f,
     val textContent: String = "{ArtistOrTitle}",
     val fontSize: Float = 30f,
-    val textColor: Long = 0xFFFFFFFF
+    val textColor: Long = 0xFFFFFFFF,
+    val imageUri: String? = null
 )
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String {
