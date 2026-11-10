@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -55,6 +56,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.collectAsState
@@ -292,6 +295,22 @@ fun AuralisApp() {
                         highFrequencyFraction = fftUpper,
                         modifier = Modifier.fillMaxSize()
                     )
+                    editorLayers.filter { it.type == "Text" && it.visible && it.textContent.isNotBlank() }.forEach { textLayer ->
+                        Text(
+                            text = textLayer.textContent,
+                            color = Color(textLayer.textColor).copy(alpha = textLayer.opacity),
+                            fontSize = textLayer.fontSize.sp,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .graphicsLayer {
+                                    translationX = (textLayer.x - 0.5f) * size.width
+                                    translationY = (textLayer.y - 0.5f) * size.height
+                                    scaleX = textLayer.scale
+                                    scaleY = textLayer.scale
+                                    rotationZ = textLayer.rotation
+                                }
+                        )
+                    }
                     if (selectedTrackName == null) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = StudioAccent, modifier = Modifier.size(30.dp))
@@ -441,7 +460,18 @@ fun AuralisApp() {
                                 PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%")
                                 PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale))
                                 PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°")
-                                Text("Layer controls are interactive. Non-bars renderers are being implemented separately.", color = StudioMuted, fontSize = 8.sp)
+                                if (selected.type == "Text") {
+                                    Text("TEXT CONTENT", color = StudioMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    BasicTextField(
+                                        value = selected.textContent,
+                                        onValueChange = { editorLayers[selectedIndex] = selected.copy(textContent = it) },
+                                        textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 11.sp),
+                                        modifier = Modifier.fillMaxWidth().background(StudioBlack, RoundedCornerShape(2.dp)).padding(8.dp)
+                                    )
+                                    PropertySlider("Font size", ((selected.fontSize - 8f) / 88f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(fontSize = 8f + it * 88f) }, "8 SP", "96 SP", "${selected.fontSize.toInt()} sp")
+                                    PropertyInfoRow("Text renderer", "Compose overlay / active")
+                                }
+                                Text("Text layers render in preview. Other non-bars renderers are still pending.", color = StudioMuted, fontSize = 8.sp)
                             }
                         }
                         2 -> {
@@ -549,7 +579,10 @@ private data class EditorLayer(
     val id: Int, val type: String, val name: String,
     val visible: Boolean = true, val opacity: Float = 1f,
     val x: Float = 0.5f, val y: Float = 0.5f,
-    val scale: Float = 1f, val rotation: Float = 0f
+    val scale: Float = 1f, val rotation: Float = 0f,
+    val textContent: String = "{ArtistOrTitle}",
+    val fontSize: Float = 30f,
+    val textColor: Long = 0xFFFFFFFF
 )
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String {
