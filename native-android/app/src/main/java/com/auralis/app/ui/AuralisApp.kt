@@ -1,5 +1,6 @@
 package com.auralis.app.ui
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
@@ -51,6 +52,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,7 +64,11 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.auralis.app.audio.AudioSessionBridge
 import com.auralis.app.playback.AuralisPlaybackService
+import com.auralis.app.visualizer.VisualizerCapture
+import com.auralis.app.visualizer.VisualizerSettings
+import com.auralis.app.visualizer.VisualizerSurface
 import com.auralis.app.ui.theme.StudioAccent
 import com.auralis.app.ui.theme.StudioBlack
 import com.auralis.app.ui.theme.StudioLine
@@ -91,6 +98,20 @@ fun AuralisApp() {
     var glow by remember { mutableFloatStateOf(0.25f) }
     var audioGain by remember { mutableFloatStateOf(0.70f) }
     var layerOpacity by remember { mutableFloatStateOf(1f) }
+    val audioSessionId by AudioSessionBridge.sessionId.collectAsState()
+    var hasAudioPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED)
+    }
+    val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasAudioPermission = granted
+        if (!granted) playerMessage = "AUDIO VISUALIZER PERMISSION DENIED"
+    }
+
+    LaunchedEffect(audioSessionId) {
+        if (audioSessionId > 0 && !hasAudioPermission) {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     DisposableEffect(context) {
         val token = SessionToken(context, ComponentName(context, AuralisPlaybackService::class.java))
@@ -236,18 +257,26 @@ fun AuralisApp() {
                         .padding(1.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = StudioAccent, modifier = Modifier.size(38.dp))
-                        Text("LIVE PREVIEW", color = StudioWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        Text(
-                            if (selectedTrackName == null) "Import audio to begin"
-                            else "Audio loaded • visualizer renderer pending",
-                            color = StudioMuted,
-                            fontSize = 10.sp
-                        )
+                    LiveVisualizerPreview(
+                        audioSessionId = audioSessionId,
+                        hasAudioPermission = hasAudioPermission,
+                        settings = VisualizerSettings(
+                            barCount = (12 + barCount * 116).toInt(),
+                            sensitivity = 0.35f + sensitivity * 2.65f,
+                            smoothing = smoothing * 0.9f,
+                            glow = glow,
+                            opacity = layerOpacity
+                        ),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    if (selectedTrackName == null) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = StudioAccent, modifier = Modifier.size(30.dp))
+                            Text("LIVE VISUALIZER", color = StudioWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                            Text("Import audio to begin", color = StudioMuted, fontSize = 9.sp)
+                        }
+                    } else if (!hasAudioPermission) {
+                        Text("Allow audio permission to enable FFT capture", color = StudioMuted, fontSize = 9.sp)
                     }
                 }
             }
@@ -350,7 +379,7 @@ fun AuralisApp() {
                             PropertySlider("Bar count", barCount, { barCount = it }, "FEWER", "MORE", "${(12 + barCount * 116).toInt()}")
                             PropertySlider("Smoothing", smoothing, { smoothing = it }, "FAST", "SMOOTH", "${(smoothing * 100).toInt()}%")
                             PropertySlider("Glow intensity", glow, { glow = it }, "0", "MAX", "${(glow * 100).toInt()}%")
-                            Text("Visualizer controls are prepared for the upcoming FFT/OpenGL engine connection.", color = StudioMuted, fontSize = 8.sp)
+                            Text("Live FFT → 128 analysis bands → OpenGL ES 2.0 spectrum renderer.", color = StudioMuted, fontSize = 8.sp)
                         }
                         1 -> {
                             PropertySlider("Selected layer opacity", layerOpacity, { layerOpacity = it }, "0%", "100%", "${(layerOpacity * 100).toInt()}%")
@@ -365,13 +394,38 @@ fun AuralisApp() {
                         else -> {
                             PropertyInfoRow("Interface", "Monochrome studio")
                             PropertyInfoRow("Preview layout", "40% preview / 60% controls")
-                            PropertyInfoRow("Rendering", "OpenGL ES — planned")
+                            PropertyInfoRow("Rendering", "OpenGL ES 2.0 live spectrum")
                             PropertyInfoRow("Video export", "MediaCodec / MediaMuxer — planned")
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LiveVisualizerPreview(
+    audioSessionId: Int,
+    hasAudioPermission: Boolean,
+    settings: VisualizerSettings,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val surface = remember(context) { VisualizerSurface(context) }
+
+    AndroidView(
+        factory = { surface },
+        update = { it.updateSettings(settings) },
+        modifier = modifier
+    )
+
+    DisposableEffect(surface, audioSessionId, hasAudioPermission, settings.smoothing) {
+        val capture = VisualizerCapture(smoothing = settings.smoothing) { values ->
+            surface.submitSpectrum(values)
+        }
+        if (hasAudioPermission && audioSessionId > 0) capture.start(audioSessionId)
+        onDispose { capture.stop() }
     }
 }
 
