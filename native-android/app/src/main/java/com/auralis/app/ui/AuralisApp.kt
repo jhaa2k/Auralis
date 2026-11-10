@@ -111,6 +111,10 @@ fun AuralisApp() {
     var fftUpper by remember { mutableFloatStateOf(0.92f) }
     var beatSensitivity by remember { mutableFloatStateOf(0.55f) }
     var mirrorEnabled by remember { mutableStateOf(false) }
+    var particleCount by remember { mutableFloatStateOf(0.30f) }
+    var particleSpeed by remember { mutableFloatStateOf(0.35f) }
+    var particleSize by remember { mutableFloatStateOf(0.25f) }
+    var particleSpread by remember { mutableFloatStateOf(0.40f) }
 
     // These editor values are UI state. They will be connected to the render engine in a later phase.
     var sensitivity by remember { mutableFloatStateOf(0.65f) }
@@ -232,6 +236,7 @@ fun AuralisApp() {
     }
 
     val barsLayer = editorLayers.firstOrNull { it.type == "Bars" }
+    val particlesLayer = editorLayers.firstOrNull { it.type == "Particles" }
 
     Scaffold(
         containerColor = StudioBlack,
@@ -302,7 +307,12 @@ fun AuralisApp() {
                             positionX = barsLayer?.x ?: 0.5f,
                             positionY = barsLayer?.y ?: 0.5f,
                             scale = barsLayer?.scale ?: 1f,
-                            rotation = barsLayer?.rotation ?: 0f
+                            rotation = barsLayer?.rotation ?: 0f,
+                            particlesEnabled = particlesLayer?.visible == true,
+                            particleCount = (20 + particleCount * 380).toInt(),
+                            particleSpeed = 0.1f + particleSpeed * 3.9f,
+                            particleSize = 1f + particleSize * 11f,
+                            particleSpread = 0.1f + particleSpread * 1.9f
                         ),
                         audioGain = 0.1f + audioGain * 3.9f,
                         lowFrequencyFraction = fftLower,
@@ -485,6 +495,14 @@ fun AuralisApp() {
                                 PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%")
                                 PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale))
                                 PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°")
+                                if (selected.type == "Particles") {
+                                    PropertySlider("Particle count", particleCount, { particleCount = it }, "20", "400", "${(20 + particleCount * 380).toInt()}")
+                                    PropertySlider("Movement speed", particleSpeed, { particleSpeed = it }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", 0.1f + particleSpeed * 3.9f))
+                                    PropertySlider("Particle size", particleSize, { particleSize = it }, "1 PX", "12 PX", "${(1f + particleSize * 11f).toInt()} px")
+                                    PropertySlider("Spread", particleSpread, { particleSpread = it }, "NARROW", "WIDE", "${((0.1f + particleSpread * 1.9f) * 100).toInt()}%")
+                                    PropertyInfoRow("Renderer", "OpenGL ES / animated points")
+                                    PropertyInfoRow("Audio response", "Live FFT energy modulation")
+                                }
                                 if (selected.type == "Image") {
                                     Button(
                                         onClick = { imagePicker.launch(arrayOf("image/*")) },
@@ -505,7 +523,7 @@ fun AuralisApp() {
                                     PropertySlider("Font size", ((selected.fontSize - 8f) / 88f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(fontSize = 8f + it * 88f) }, "8 SP", "96 SP", "${selected.fontSize.toInt()} sp")
                                     PropertyInfoRow("Text renderer", "Compose overlay / active")
                                 }
-                                Text("Text layers render in preview. Other non-bars renderers are still pending.", color = StudioMuted, fontSize = 8.sp)
+                                Text("Text, image and particle layers render in preview. Other effects remain pending.", color = StudioMuted, fontSize = 8.sp)
                             }
                         }
                         2 -> {
