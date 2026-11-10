@@ -109,9 +109,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             beatPulse *= 0.88f
         }
         previousBassEnergy = previousBassEnergy * 0.72f + bassEnergy * 0.28f
-        val positionSignal = measureSignal(config.positionMeasure, elapsedSeconds, data.average().toFloat(), beatPulse)
-        val scaleSignal = measureSignal(config.scaleMeasure, elapsedSeconds, data.average().toFloat(), beatPulse)
-        val rotationSignal = measureSignal(config.rotationMeasure, elapsedSeconds, data.average().toFloat(), beatPulse)
+        val positionSignal = measureSignal(config.positionMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
+        val scaleSignal = measureSignal(config.scaleMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
+        val rotationSignal = measureSignal(config.rotationMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val amount = config.measureAmount
         val effectivePositionX = (config.positionX + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
         val effectivePositionY = (config.positionY + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
@@ -210,7 +210,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         GLES20.glDisableVertexAttribArray(colorHandle)
     }
 
-    private fun measureSignal(what: MeasureWhat, elapsed: Float, energy: Float, beat: Float): Float {
+    private fun measureSignal(what: MeasureWhat, elapsed: Float, energy: Float, beat: Float, trackPosition: Float): Float {
         val phase = elapsed * 0.7f
         return when (what) {
             MeasureWhat.NOTHING -> 0.5f
@@ -219,7 +219,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             MeasureWhat.TOTAL_TIME_BACKWARD -> 1f - ((elapsed * 0.25f) % 1f)
             MeasureWhat.TOTAL_TIME_WHEN_PLAYING -> if (energy > 0.015f) (elapsed * 0.25f) % 1f else 0.5f
             MeasureWhat.TOTAL_TIME_AND_BEAT -> (((elapsed * 0.25f) % 1f) * 0.65f + beat * 0.35f).coerceIn(0f, 1f)
-            MeasureWhat.TRACK_POSITION -> 0.5f
+            MeasureWhat.TRACK_POSITION -> trackPosition
             MeasureWhat.BEAT_RANDOM_SHAKE -> 0.5f + beat * sin(elapsed * 37f) * 0.5f
             MeasureWhat.BEAT_CAM_SHAKE_ROT_MORE -> 0.5f + beat * 0.5f
             MeasureWhat.BEAT_CAM_SHAKE_ROT_LESS -> 0.5f - beat * 0.5f
