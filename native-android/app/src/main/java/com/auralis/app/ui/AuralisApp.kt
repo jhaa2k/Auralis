@@ -111,7 +111,6 @@ fun AuralisApp() {
     var fftLower by remember { mutableFloatStateOf(0.02f) }
     var fftUpper by remember { mutableFloatStateOf(0.92f) }
     var beatSensitivity by remember { mutableFloatStateOf(0.55f) }
-    var rgbSplitAmount by remember { mutableFloatStateOf(0f) }
     var mirrorEnabled by remember { mutableStateOf(false) }
     var particleCount by remember { mutableFloatStateOf(0.30f) }
     var particleSpeed by remember { mutableFloatStateOf(0.35f) }
@@ -330,7 +329,7 @@ fun AuralisApp() {
                             measureAmount = barsLayer?.measureAmount ?: 0.5f,
                             trackPositionFraction = if (playbackDuration > 0L) (playbackPosition.toFloat() / playbackDuration.toFloat()).coerceIn(0f, 1f) else 0f,
                             beatSensitivity = beatSensitivity,
-                            rgbSplitAmount = if (editorLayers.any { it.type == "RGB Split" && it.visible }) rgbSplitAmount else 0f
+                            rgbSplitAmount = editorLayers.filter { it.type == "RGB Split" && it.visible }.maxOfOrNull { it.rgbSplitAmount } ?: 0f
                         ),
                         audioGain = 0.1f + audioGain * 3.9f,
                         lowFrequencyFraction = fftLower,
@@ -529,6 +528,11 @@ fun AuralisApp() {
                                     PropertyInfoRow("Renderer", "OpenGL ES / animated points")
                                     PropertyInfoRow("Audio response", "Live FFT energy modulation")
                                 }
+                                if (selected.type == "RGB Split") {
+                                    PropertySlider("Channel separation", selected.rgbSplitAmount, { editorLayers[selectedIndex] = selected.copy(rgbSplitAmount = it) }, "0 PX", "MAX", "${(selected.rgbSplitAmount * 100).toInt()}%")
+                                    PropertyInfoRow("GPU renderer", "OpenGL RGB channel offsets")
+                                    PropertyInfoRow("Effect scope", "Spectrum geometry only")
+                                }
                                 if (selected.type == "Image") {
                                     Button(
                                         onClick = { imagePicker.launch(arrayOf("image/*")) },
@@ -563,8 +567,6 @@ fun AuralisApp() {
                         }
                         3 -> {
                             PropertySlider("Glow intensity", glow, { glow = it }, "OFF", "MAX", "${(glow * 100).toInt()}%")
-                            PropertySlider("RGB split intensity", rgbSplitAmount, { rgbSplitAmount = it }, "OFF", "STRONG", "${(rgbSplitAmount * 100).toInt()}%")
-                            PropertyInfoRow("RGB Split renderer", if (rgbSplitAmount > 0f && editorLayers.any { it.type == "RGB Split" && it.visible }) "OpenGL channel offsets / active" else "Disabled")
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
                                 Text("Mirror spectrum", color = StudioWhite, fontSize = 10.sp)
@@ -735,7 +737,8 @@ private data class EditorLayer(
     val positionMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val scaleMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val rotationMeasure: MeasureWhat = MeasureWhat.NOTHING,
-    val measureAmount: Float = 0.5f
+    val measureAmount: Float = 0.5f,
+    val rgbSplitAmount: Float = 0f
 )
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String {
