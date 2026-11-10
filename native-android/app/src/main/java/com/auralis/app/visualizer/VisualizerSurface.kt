@@ -188,14 +188,28 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             points.clear()
             val now = System.nanoTime() / 1_000_000_000.0
             val energy = data.average().coerceIn(0f, 1f)
+            val particlePositionSignal = measureSignal(config.particlePositionMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
+            val particleScaleSignal = measureSignal(config.particleScaleMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
+            val particleRotationSignal = measureSignal(config.particleRotationMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
+            val particleAmount = config.particleMeasureAmount
+            val particleXOffset = (config.particlePositionX - 0.5f) * 2f + (particlePositionSignal - 0.5f) * particleAmount * 0.6f
+            val particleYOffset = (0.5f - config.particlePositionY) * 2f - (particlePositionSignal - 0.5f) * particleAmount * 0.6f
+            val particleScale = (config.particleScale * (1f + (particleScaleSignal - 0.5f) * particleAmount)).coerceIn(0.1f, 3f)
+            val particleRotation = Math.toRadians((config.particleRotation + (particleRotationSignal - 0.5f) * particleAmount * 90f).toDouble())
+            val particleCos = cos(particleRotation).toFloat()
+            val particleSin = sin(particleRotation).toFloat()
             for (i in 0 until config.particleCount) {
                 val seed = i.toFloat()
                 val phase = ((now * config.particleSpeed * 0.12 + seed * 0.6180339) % 1.0).toFloat()
                 val angle = seed * 2.3999632f
                 val radial = (0.12f + ((seed * 0.7548776f) % 1f) * config.particleSpread) * (0.65f + energy * 0.75f)
-                val x = (cos(angle + now.toFloat() * 0.10f * config.particleSpeed) * radial).coerceIn(-0.98f, 0.98f)
-                val y = (phase * 2f - 1f + sin(angle * 1.7f + now.toFloat() * 0.4f) * 0.08f).coerceIn(-0.98f, 0.98f)
-                val alpha = (config.opacity * (0.30f + energy * 0.70f) * (0.45f + ((seed * 0.31f) % 0.55f))).coerceIn(0f, 1f)
+                val baseX = cos(angle + now.toFloat() * 0.10f * config.particleSpeed) * radial
+                val baseY = phase * 2f - 1f + sin(angle * 1.7f + now.toFloat() * 0.4f) * 0.08f
+                val localX = baseX * particleScale
+                val localY = baseY * particleScale
+                val x = (localX * particleCos - localY * particleSin + particleXOffset).coerceIn(-1.2f, 1.2f)
+                val y = (localX * particleSin + localY * particleCos + particleYOffset).coerceIn(-1.2f, 1.2f)
+                val alpha = (config.particleOpacity * (0.30f + energy * 0.70f) * (0.45f + ((seed * 0.31f) % 0.55f))).coerceIn(0f, 1f)
                 points.put(x)
                 points.put(y)
                 points.put(0.48f + energy * 0.30f)
