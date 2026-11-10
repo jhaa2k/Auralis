@@ -35,6 +35,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var colorHandle = 0
     private var pointSizeHandle = 0
     private var roundPointHandle = 0
+    private var offsetHandle = 0
+    private var tintHandle = 0
     private var vertexBuffer: FloatBuffer? = null
     private var particleBuffer: FloatBuffer? = null
     private val vertexCapacity = 128 * 24 * 6
@@ -59,8 +61,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             attribute vec4 aColor;
             varying vec4 vColor;
             uniform float uPointSize;
+            uniform vec2 uOffset;
             void main() {
-                gl_Position = vec4(aPosition, 0.0, 1.0);
+                gl_Position = vec4(aPosition + uOffset, 0.0, 1.0);
                 gl_PointSize = uPointSize;
                 vColor = aColor;
             }
@@ -69,9 +72,10 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             precision mediump float;
             varying vec4 vColor;
             uniform float uRoundPoint;
+            uniform vec4 uTint;
             void main() {
                 if (uRoundPoint > 0.5 && distance(gl_PointCoord, vec2(0.5, 0.5)) > 0.5) discard;
-                gl_FragColor = vColor;
+                gl_FragColor = vec4(vColor.rgb * uTint.rgb, vColor.a * uTint.a);
             }
         """.trimIndent()
         program = linkProgram(compileShader(GLES20.GL_VERTEX_SHADER, vertexShader), compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentShader))
@@ -79,6 +83,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         colorHandle = GLES20.glGetAttribLocation(program, "aColor")
         pointSizeHandle = GLES20.glGetUniformLocation(program, "uPointSize")
         roundPointHandle = GLES20.glGetUniformLocation(program, "uRoundPoint")
+        offsetHandle = GLES20.glGetUniformLocation(program, "uOffset")
+        tintHandle = GLES20.glGetUniformLocation(program, "uTint")
         vertexBuffer = ByteBuffer.allocateDirect(vertexCapacity * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         particleBuffer = ByteBuffer.allocateDirect(400 * 6 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
@@ -181,7 +187,19 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, buffer)
         GLES20.glUniform1f(roundPointHandle, 0f)
         GLES20.glUniform1f(pointSizeHandle, 1f)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, offset / 6)
+        val vertexCount = offset / 6
+        if (config.rgbSplitAmount > 0f) {
+            val shift = 0.002f + config.rgbSplitAmount * 0.028f
+            GLES20.glUniform2f(offsetHandle, -shift, 0f)
+            GLES20.glUniform4f(tintHandle, 1f, 0.18f, 0.18f, 0.62f)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
+            GLES20.glUniform2f(offsetHandle, shift, 0f)
+            GLES20.glUniform4f(tintHandle, 0.18f, 0.85f, 1f, 0.62f)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
+        }
+        GLES20.glUniform2f(offsetHandle, 0f, 0f)
+        GLES20.glUniform4f(tintHandle, 1f, 1f, 1f, 1f)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
 
         if (config.particlesEnabled && config.particleCount > 0) {
             val points = particleBuffer ?: return
@@ -220,6 +238,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             points.position(0)
             GLES20.glUniform1f(roundPointHandle, 1f)
             GLES20.glUniform1f(pointSizeHandle, config.particleSize)
+            GLES20.glUniform2f(offsetHandle, 0f, 0f)
+            GLES20.glUniform4f(tintHandle, 1f, 1f, 1f, 1f)
             GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 24, points)
             points.position(2)
             GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, points)
