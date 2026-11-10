@@ -44,7 +44,7 @@ class VisualizerCapture(
                         val result = FloatArray(128)
                         val bins = fft.size / 2
                         val lowBin = (1f + lowFrequencyFraction.coerceIn(0f, 0.95f) * (bins - 2)).toInt().coerceIn(1, bins - 2)
-                        val highBin = (1f + highFrequencyFraction.coerceIn(lowFrequencyFraction + 0.05f, 1f) * (bins - 2)).toInt().coerceIn(lowBin + 1, bins - 1)
+                        val highBin = (1f + highFrequencyFraction.coerceIn(lowFrequencyFraction.coerceIn(0f, 0.95f) + 0.05f, 1f) * (bins - 2)).toInt().coerceIn(lowBin + 1, bins - 1)
                         for (bar in result.indices) {
                             // Logarithmic grouping gives bass frequencies more screen space.
                             val ratio = highBin.toDouble() / lowBin.toDouble()
