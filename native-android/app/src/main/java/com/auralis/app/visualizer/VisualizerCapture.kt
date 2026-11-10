@@ -11,6 +11,9 @@ import kotlin.math.pow
  */
 class VisualizerCapture(
     private val smoothing: Float = 0.35f,
+    private val gain: Float = 1f,
+    private val lowFrequencyFraction: Float = 0f,
+    private val highFrequencyFraction: Float = 1f,
     private val onSpectrum: (FloatArray) -> Unit
 ) {
     private var visualizer: Visualizer? = null
@@ -40,11 +43,13 @@ class VisualizerCapture(
                         if (fft == null || fft.size < 8) return
                         val result = FloatArray(128)
                         val bins = fft.size / 2
+                        val lowBin = (1f + lowFrequencyFraction.coerceIn(0f, 0.95f) * (bins - 2)).toInt().coerceIn(1, bins - 2)
+                        val highBin = (1f + highFrequencyFraction.coerceIn(lowFrequencyFraction + 0.05f, 1f) * (bins - 2)).toInt().coerceIn(lowBin + 1, bins - 1)
                         for (bar in result.indices) {
                             // Logarithmic grouping gives bass frequencies more screen space.
-                            val start = (2.0 * (bins / 2.0).pow(bar / 128.0)).toInt().coerceIn(1, bins - 1)
-                            val end = (2.0 * (bins / 2.0).pow((bar + 1) / 128.0)).toInt()
-                                .coerceIn(start + 1, bins)
+                            val ratio = highBin.toDouble() / lowBin.toDouble()
+                            val start = (lowBin * ratio.pow(bar / 128.0)).toInt().coerceIn(lowBin, highBin - 1)
+                            val end = (lowBin * ratio.pow((bar + 1) / 128.0)).toInt().coerceIn(start + 1, highBin + 1)
                             var peak = 0f
                             for (bin in start until end) {
                                 val real = fft[bin * 2].toInt()
@@ -52,7 +57,7 @@ class VisualizerCapture(
                                 val magnitude = hypot(real.toDouble(), imaginary.toDouble()).toFloat() / 128f
                                 if (magnitude > peak) peak = magnitude
                             }
-                            result[bar] = (ln(1f + peak * 8f) / ln(9f)).coerceIn(0f, 1f)
+                            result[bar] = (ln(1f + peak * gain.coerceIn(0.1f, 4f) * 8f) / ln(9f)).coerceIn(0f, 1f)
                         }
                         for (i in result.indices) {
                             smoothed[i] = smoothed[i] * smoothing.coerceIn(0f, 0.95f) + result[i] * (1f - smoothing.coerceIn(0f, 0.95f))
