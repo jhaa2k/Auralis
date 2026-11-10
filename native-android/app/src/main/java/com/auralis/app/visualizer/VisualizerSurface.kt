@@ -40,6 +40,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private val vertexCapacity = 128 * 24 * 6
     private val rendererStartNanos = System.nanoTime()
     private var previousBassEnergy = 0f
+    private var bassNoiseFloor = 0.025f
     private var beatPulse = 0f
     private var lastBeatNanos = 0L
 
@@ -102,7 +103,11 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val elapsedSeconds = ((nowNanos - rendererStartNanos) / 1_000_000_000.0).toFloat()
         val bassBins = min(12, data.size)
         val bassEnergy = if (bassBins > 0) data.take(bassBins).average().toFloat() else 0f
-        if (bassEnergy > 0.10f && bassEnergy > previousBassEnergy * 1.32f && nowNanos - lastBeatNanos > 180_000_000L) {
+        bassNoiseFloor = bassNoiseFloor * 0.985f + min(bassEnergy, bassNoiseFloor * 1.8f) * 0.015f
+        val beatThreshold = (0.12f - config.beatSensitivity * 0.075f).coerceIn(0.045f, 0.12f)
+        val adaptiveFloor = max(beatThreshold, bassNoiseFloor * (2.0f - config.beatSensitivity * 0.65f))
+        val onsetRatio = 1.48f - config.beatSensitivity * 0.40f
+        if (bassEnergy > adaptiveFloor && bassEnergy > previousBassEnergy * onsetRatio && nowNanos - lastBeatNanos > 200_000_000L) {
             beatPulse = 1f
             lastBeatNanos = nowNanos
         } else {
