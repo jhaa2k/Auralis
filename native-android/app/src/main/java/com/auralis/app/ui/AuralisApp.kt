@@ -436,7 +436,7 @@ fun AuralisApp() {
                             if (selectedIndex >= 0) {
                                 val selected = editorLayers[selectedIndex]
                                 Text("PROPERTIES / ${selected.name.uppercase(Locale.US)}", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                PropertySlider("Opacity", selected.opacity, { editorLayers[selectedIndex] = selected.copy(opacity = it); if (selected.type == "Bars") layerOpacity = it }, "0%", "100%", "${(selected.opacity * 100).toInt()}%")
+                                PropertySlider("Opacity", selected.opacity, { editorLayers[selectedIndex] = selected.copy(opacity = it) }, "0%", "100%", "${(selected.opacity * 100).toInt()}%")
                                 PropertySlider("Position X", selected.x, { editorLayers[selectedIndex] = selected.copy(x = it) }, "LEFT", "RIGHT", "${(selected.x * 100).toInt()}%")
                                 PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%")
                                 PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale))
