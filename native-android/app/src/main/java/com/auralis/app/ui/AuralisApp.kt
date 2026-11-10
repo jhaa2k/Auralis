@@ -214,6 +214,8 @@ fun AuralisApp() {
         }
     }
 
+    val barsLayer = editorLayers.firstOrNull { it.type == "Bars" }
+
     Scaffold(
         containerColor = StudioBlack,
         bottomBar = {
@@ -277,8 +279,12 @@ fun AuralisApp() {
                             sensitivity = 0.35f + sensitivity * 2.65f,
                             smoothing = smoothing * 0.9f,
                             glow = glow,
-                            opacity = layerOpacity,
-                            mirror = mirrorEnabled
+                            opacity = if (barsLayer?.visible == false) 0f else layerOpacity * (barsLayer?.opacity ?: 1f),
+                            mirror = mirrorEnabled,
+                            positionX = barsLayer?.x ?: 0.5f,
+                            positionY = barsLayer?.y ?: 0.5f,
+                            scale = barsLayer?.scale ?: 1f,
+                            rotation = barsLayer?.rotation ?: 0f
                         ),
                         modifier = Modifier.fillMaxSize()
                     )
