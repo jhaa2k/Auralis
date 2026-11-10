@@ -31,6 +31,9 @@ import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -46,6 +49,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -90,6 +94,14 @@ fun AuralisApp() {
     var playbackDuration by remember { mutableLongStateOf(0L) }
     var playerMessage by remember { mutableStateOf("CONNECTING TO AUDIO ENGINE") }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val editorLayers = remember { mutableStateListOf(EditorLayer(1, "Composition", "Main Composition"), EditorLayer(2, "Bars", "Spectrum Bars")) }
+    var selectedLayerId by remember { mutableIntStateOf(2) }
+    var nextLayerId by remember { mutableIntStateOf(3) }
+    var addLayerMenuExpanded by remember { mutableStateOf(false) }
+    var fftLower by remember { mutableFloatStateOf(0.02f) }
+    var fftUpper by remember { mutableFloatStateOf(0.92f) }
+    var beatSensitivity by remember { mutableFloatStateOf(0.55f) }
+    var mirrorEnabled by remember { mutableStateOf(false) }
 
     // These editor values are UI state. They will be connected to the render engine in a later phase.
     var sensitivity by remember { mutableFloatStateOf(0.65f) }
@@ -206,7 +218,7 @@ fun AuralisApp() {
         containerColor = StudioBlack,
         bottomBar = {
             NavigationBar(containerColor = StudioPanel, contentColor = StudioWhite) {
-                val tabs = listOf("STUDIO", "LAYERS", "AUDIO", "SETTINGS")
+                val tabs = listOf("STUDIO", "LAYERS", "AUDIO", "EFFECTS", "SETTINGS")
                 val icons = listOf(
                     Icons.Outlined.GraphicEq,
                     Icons.Outlined.Layers,
@@ -357,7 +369,7 @@ fun AuralisApp() {
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        listOf("STUDIO PROPERTIES", "LAYER PROPERTIES", "AUDIO PROPERTIES", "APP SETTINGS")[selectedTab],
+                        listOf("STUDIO PROPERTIES", "LAYER EDITOR", "AUDIO PROVIDER", "EFFECTS", "APP SETTINGS")[selectedTab],
                         color = StudioWhite,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -378,24 +390,73 @@ fun AuralisApp() {
                             PropertySlider("Sensitivity", sensitivity, { sensitivity = it }, "LOW", "HIGH", "${(sensitivity * 100).toInt()}%")
                             PropertySlider("Bar count", barCount, { barCount = it }, "FEWER", "MORE", "${(12 + barCount * 116).toInt()}")
                             PropertySlider("Smoothing", smoothing, { smoothing = it }, "FAST", "SMOOTH", "${(smoothing * 100).toInt()}%")
-                            PropertySlider("Glow intensity", glow, { glow = it }, "0", "MAX", "${(glow * 100).toInt()}%")
-                            Text("Live FFT → 128 analysis bands → OpenGL ES 2.0 spectrum renderer.", color = StudioMuted, fontSize = 8.sp)
+                            PropertySlider("Opacity", layerOpacity, { layerOpacity = it }, "0%", "100%", "${(layerOpacity * 100).toInt()}%")
+                            Text("Live app-audio FFT feeding the OpenGL spectrum renderer.", color = StudioMuted, fontSize = 8.sp)
                         }
                         1 -> {
-                            PropertySlider("Selected layer opacity", layerOpacity, { layerOpacity = it }, "0%", "100%", "${(layerOpacity * 100).toInt()}%")
-                            PropertyInfoRow("Layer stack", "Background  •  Visualizer  •  Text")
-                            PropertyInfoRow("Layer actions", "Add / duplicate / delete — next phase")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("LAYER STACK", color = StudioMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.weight(1f))
+                                Box {
+                                    Button(onClick = { addLayerMenuExpanded = true }, colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack), shape = RoundedCornerShape(2.dp)) { Text("+ ADD ELEMENT", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                                    DropdownMenu(expanded = addLayerMenuExpanded, onDismissRequest = { addLayerMenuExpanded = false }) {
+                                        listOf("Composition", "Text", "Bars", "Particles", "Image", "Blur Effect", "RGB Split", "Motion Blur", "Mirror Effect", "Custom Shader").forEach { type ->
+                                            DropdownMenuItem(text = { Text(type) }, onClick = {
+                                                val layer = EditorLayer(nextLayerId++, type, if (type == "Bars") "Spectrum Bars" else type)
+                                                editorLayers.add(layer); selectedLayerId = layer.id; addLayerMenuExpanded = false
+                                            })
+                                        }
+                                    }
+                                }
+                            }
+                            editorLayers.forEachIndexed { index, layer ->
+                                Row(Modifier.fillMaxWidth().background(if (layer.id == selectedLayerId) StudioRaised else StudioBlack, RoundedCornerShape(2.dp)).padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                                    Text(if (layer.visible) "●" else "○", color = if (layer.visible) StudioAccent else StudioMuted, fontSize = 10.sp)
+                                    Column(Modifier.weight(1f)) {
+                                        Text(layer.name, color = StudioWhite, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(layer.type.uppercase(Locale.US), color = StudioMuted, fontSize = 7.sp)
+                                    }
+                                    Button(onClick = { selectedLayerId = layer.id }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 7.dp, vertical = 2.dp), colors = ButtonDefaults.buttonColors(containerColor = if (layer.id == selectedLayerId) StudioAccent else StudioPanel, contentColor = if (layer.id == selectedLayerId) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("EDIT", fontSize = 8.sp) }
+                                    Button(onClick = { editorLayers[index] = layer.copy(visible = !layer.visible) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioPanel), shape = RoundedCornerShape(2.dp)) { Text(if (layer.visible) "ON" else "OFF", fontSize = 8.sp, color = StudioWhite) }
+                                    Button(onClick = { if (editorLayers.size > 1) { editorLayers.removeAt(index); if (selectedLayerId == layer.id) selectedLayerId = editorLayers.last().id } }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioPanel), shape = RoundedCornerShape(2.dp)) { Text("×", fontSize = 11.sp, color = StudioWhite) }
+                                }
+                            }
+                            val selectedIndex = editorLayers.indexOfFirst { it.id == selectedLayerId }
+                            if (selectedIndex >= 0) {
+                                val selected = editorLayers[selectedIndex]
+                                Text("PROPERTIES / ${selected.name.uppercase(Locale.US)}", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                PropertySlider("Opacity", selected.opacity, { editorLayers[selectedIndex] = selected.copy(opacity = it); if (selected.type == "Bars") layerOpacity = it }, "0%", "100%", "${(selected.opacity * 100).toInt()}%")
+                                PropertySlider("Position X", selected.x, { editorLayers[selectedIndex] = selected.copy(x = it) }, "LEFT", "RIGHT", "${(selected.x * 100).toInt()}%")
+                                PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%")
+                                PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale))
+                                PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°")
+                                Text("Layer controls are interactive. Non-bars renderers are being implemented separately.", color = StudioMuted, fontSize = 8.sp)
+                            }
                         }
                         2 -> {
-                            PropertySlider("Audio gain", audioGain, { audioGain = it }, "QUIET", "LOUD", "${(audioGain * 100).toInt()}%")
-                            PropertyInfoRow("Playback engine", "Media3 ExoPlayer")
-                            PropertyInfoRow("Track source", selectedTrackName ?: "No audio selected")
+                            PropertySlider("Input gain", audioGain, { audioGain = it }, "QUIET", "LOUD", "${(audioGain * 100).toInt()}%")
+                            PropertySlider("Spectrum lower range", fftLower, { fftLower = it.coerceAtMost(fftUpper - 0.05f) }, "LOW", "MID", "${(20 + fftLower * 180).toInt()} Hz")
+                            PropertySlider("Spectrum upper range", fftUpper, { fftUpper = it.coerceAtLeast(fftLower + 0.05f) }, "MID", "HIGH", "${(200 + fftUpper * 17800).toInt()} Hz")
+                            PropertySlider("Beat sensitivity", beatSensitivity, { beatSensitivity = it }, "LESS", "MORE", "${(beatSensitivity * 100).toInt()}%")
+                            PropertyInfoRow("Sample provider", "App playback / FFT")
+                            PropertyInfoRow("FFT data", "128 logarithmic analysis bands")
+                            PropertyInfoRow("Capture source", "This app's ExoPlayer session")
+                        }
+                        3 -> {
+                            PropertySlider("Glow intensity", glow, { glow = it }, "OFF", "MAX", "${(glow * 100).toInt()}%")
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
+                                Text("Mirror spectrum", color = StudioWhite, fontSize = 10.sp)
+                            }
+                            PropertyInfoRow("Current renderer", "Spectrum bars")
+                            PropertyInfoRow("Next engines", "Particles / blur / RGB split / motion blur")
+                            Text("Only implemented effects will be marked as active.", color = StudioMuted, fontSize = 8.sp)
                         }
                         else -> {
                             PropertyInfoRow("Interface", "Monochrome studio")
                             PropertyInfoRow("Preview layout", "40% preview / 60% controls")
-                            PropertyInfoRow("Rendering", "OpenGL ES 2.0 live spectrum")
-                            PropertyInfoRow("Video export", "MediaCodec / MediaMuxer — planned")
+                            PropertyInfoRow("Rendering", "OpenGL ES 2.0")
+                            PropertyInfoRow("Video export", "Not implemented yet")
                         }
                     }
                 }
@@ -464,6 +525,13 @@ private fun PropertyInfoRow(label: String, value: String) {
         Text(value, color = StudioWhite, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
+
+private data class EditorLayer(
+    val id: Int, val type: String, val name: String,
+    val visible: Boolean = true, val opacity: Float = 1f,
+    val x: Float = 0.5f, val y: Float = 0.5f,
+    val scale: Float = 1f, val rotation: Float = 0f
+)
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String {
     val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
