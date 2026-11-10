@@ -317,7 +317,8 @@ fun AuralisApp() {
                             positionMeasure = barsLayer?.positionMeasure ?: MeasureWhat.NOTHING,
                             scaleMeasure = barsLayer?.scaleMeasure ?: MeasureWhat.NOTHING,
                             rotationMeasure = barsLayer?.rotationMeasure ?: MeasureWhat.NOTHING,
-                            measureAmount = barsLayer?.measureAmount ?: 0.5f
+                            measureAmount = barsLayer?.measureAmount ?: 0.5f,
+                            trackPositionFraction = if (playbackDuration > 0L) (playbackPosition.toFloat() / playbackDuration.toFloat()).coerceIn(0f, 1f) else 0f
                         ),
                         audioGain = 0.1f + audioGain * 3.9f,
                         lowFrequencyFraction = fftLower,
