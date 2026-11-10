@@ -30,7 +30,8 @@ data class VisualizerSettings(
     val particlePositionMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val particleScaleMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val particleRotationMeasure: MeasureWhat = MeasureWhat.NOTHING,
-    val particleMeasureAmount: Float = 0.5f
+    val particleMeasureAmount: Float = 0.5f,
+    val rgbSplitAmount: Float = 0f
 ) {
     fun sanitized() = copy(
         barCount = barCount.coerceIn(16, 128),
@@ -54,6 +55,7 @@ data class VisualizerSettings(
         particlePositionY = particlePositionY.coerceIn(-1f, 2f),
         particleScale = particleScale.coerceIn(0.1f, 3f),
         particleRotation = particleRotation.coerceIn(-180f, 180f),
-        particleMeasureAmount = particleMeasureAmount.coerceIn(0f, 1f)
+        particleMeasureAmount = particleMeasureAmount.coerceIn(0f, 1f),
+        rgbSplitAmount = rgbSplitAmount.coerceIn(0f, 1f)
     )
 }
