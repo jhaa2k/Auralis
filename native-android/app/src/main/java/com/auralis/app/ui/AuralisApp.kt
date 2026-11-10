@@ -111,6 +111,7 @@ fun AuralisApp() {
     var fftLower by remember { mutableFloatStateOf(0.02f) }
     var fftUpper by remember { mutableFloatStateOf(0.92f) }
     var beatSensitivity by remember { mutableFloatStateOf(0.55f) }
+    var rgbSplitAmount by remember { mutableFloatStateOf(0f) }
     var mirrorEnabled by remember { mutableStateOf(false) }
     var particleCount by remember { mutableFloatStateOf(0.30f) }
     var particleSpeed by remember { mutableFloatStateOf(0.35f) }
@@ -328,7 +329,8 @@ fun AuralisApp() {
                             rotationMeasure = barsLayer?.rotationMeasure ?: MeasureWhat.NOTHING,
                             measureAmount = barsLayer?.measureAmount ?: 0.5f,
                             trackPositionFraction = if (playbackDuration > 0L) (playbackPosition.toFloat() / playbackDuration.toFloat()).coerceIn(0f, 1f) else 0f,
-                            beatSensitivity = beatSensitivity
+                            beatSensitivity = beatSensitivity,
+                            rgbSplitAmount = if (editorLayers.any { it.type == "RGB Split" && it.visible }) rgbSplitAmount else 0f
                         ),
                         audioGain = 0.1f + audioGain * 3.9f,
                         lowFrequencyFraction = fftLower,
@@ -561,6 +563,8 @@ fun AuralisApp() {
                         }
                         3 -> {
                             PropertySlider("Glow intensity", glow, { glow = it }, "OFF", "MAX", "${(glow * 100).toInt()}%")
+                            PropertySlider("RGB split intensity", rgbSplitAmount, { rgbSplitAmount = it }, "OFF", "STRONG", "${(rgbSplitAmount * 100).toInt()}%")
+                            PropertyInfoRow("RGB Split renderer", if (rgbSplitAmount > 0f && editorLayers.any { it.type == "RGB Split" && it.visible }) "OpenGL channel offsets / active" else "Disabled")
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
                                 Text("Mirror spectrum", color = StudioWhite, fontSize = 10.sp)
