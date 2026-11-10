@@ -277,7 +277,8 @@ fun AuralisApp() {
                             sensitivity = 0.35f + sensitivity * 2.65f,
                             smoothing = smoothing * 0.9f,
                             glow = glow,
-                            opacity = layerOpacity
+                            opacity = layerOpacity,
+                            mirror = mirrorEnabled
                         ),
                         modifier = Modifier.fillMaxSize()
                     )
