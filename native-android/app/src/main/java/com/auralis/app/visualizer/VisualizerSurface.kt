@@ -32,7 +32,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var positionHandle = 0
     private var colorHandle = 0
     private var vertexBuffer: FloatBuffer? = null
-    private val vertexCapacity = 128 * 6 * 6
+    private val vertexCapacity = 128 * 24 * 6
 
     fun submit(values: FloatArray) {
         spectrum = values.copyOf()
@@ -80,7 +80,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val slot = 2f / count
         val barWidth = max(0.001f, slot - gap)
         val data = spectrum
-        val vertices = FloatArray(count * 6 * 6)
+        val vertices = FloatArray(count * 24 * 6)
         var offset = 0
         for (i in 0 until count) {
             val sourceIndex = (i.toFloat() / count * data.size).toInt().coerceIn(0, data.lastIndex)
@@ -95,17 +95,26 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val green = (0.72f - 0.35f * hue).coerceIn(0f, 1f)
             val blue = (0.95f - 0.55f * hue).coerceIn(0f, 1f)
             val alpha = config.opacity
-            val points = floatArrayOf(
-                x0,y0, x1,y0, x1,y1,
-                x0,y0, x1,y1, x0,y1
-            )
-            for (p in 0 until 6) {
-                vertices[offset++] = points[p * 2]
-                vertices[offset++] = points[p * 2 + 1]
-                vertices[offset++] = red
-                vertices[offset++] = green
-                vertices[offset++] = blue
-                vertices[offset++] = alpha
+            fun appendQuad(left: Float, bottom: Float, right: Float, top: Float, a: Float) {
+                val points = floatArrayOf(
+                    left,bottom, right,bottom, right,top,
+                    left,bottom, right,top, left,top
+                )
+                for (p in 0 until 6) {
+                    vertices[offset++] = points[p * 2]
+                    vertices[offset++] = points[p * 2 + 1]
+                    vertices[offset++] = red
+                    vertices[offset++] = green
+                    vertices[offset++] = blue
+                    vertices[offset++] = a
+                }
+            }
+            // Soft expanded underlay approximates a glow without an expensive blur pass.
+            if (config.glow > 0f) appendQuad(x0 - 0.006f, y0 - 0.008f, x1 + 0.006f, y1 + 0.008f, alpha * config.glow * 0.22f)
+            appendQuad(x0, y0, x1, y1, alpha)
+            if (config.mirror) {
+                if (config.glow > 0f) appendQuad(x0 - 0.006f, -y1 - 0.008f, x1 + 0.006f, -y0 + 0.008f, alpha * config.glow * 0.22f)
+                appendQuad(x0, -y1, x1, -y0, alpha)
             }
         }
         val buffer = vertexBuffer ?: return
@@ -119,7 +128,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         buffer.position(2)
         GLES20.glEnableVertexAttribArray(colorHandle)
         GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, buffer)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, count * 6)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, offset / 6)
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisableVertexAttribArray(colorHandle)
     }
