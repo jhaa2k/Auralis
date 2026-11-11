@@ -173,7 +173,7 @@ object VisualizerVideoExporter {
 
     private class GlSurface(input:android.view.Surface,w:Int,h:Int) {
         val display=EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);private val context:android.opengl.EGLContext;val surface:android.opengl.EGLSurface
-        private val program:Int;private val p:Int;private val col:Int;private val offsetHandle:Int;private val tintHandle:Int;private var buf:FloatBuffer
+        private val program:Int;private val p:Int;private val col:Int;private val offsetHandle:Int;private val tintHandle:Int;private var buf:FloatBuffer;private val previousBarHeights = FloatArray(128)
         init {
             val v=IntArray(2);check(EGL14.eglInitialize(display,v,0,v,1))
             val attrs=intArrayOf(EGL14.EGL_RED_SIZE,8,EGL14.EGL_GREEN_SIZE,8,EGL14.EGL_BLUE_SIZE,8,EGL14.EGL_ALPHA_SIZE,8,EGL14.EGL_RENDERABLE_TYPE,EGL14.EGL_OPENGL_ES2_BIT,0x3142,1,EGL14.EGL_NONE)
@@ -294,29 +294,55 @@ object VisualizerVideoExporter {
                         val index = ((if(config.flipInput) 1f-progress else progress)*(bands.size-1)).toInt().coerceIn(0,bands.lastIndex)
                         val height = (config.barMinHeight + bands[index]*config.sensitivity*config.barHeight*.88f).coerceIn(.005f,1.5f)
                         val left=-1f+i*slot+(slot-width)*.5f; val right=left+width; val base=-.94f
-                        var cursor = base
-                        val defaultSegmentHeight = height / styles.size.coerceAtLeast(1)
-                        styles.forEachIndexed { segmentIndex, style ->
-                            val partHeight = if (style.fixedHeight > 0f) (style.fixedHeight*.25f).coerceAtMost(1.5f) else defaultSegmentHeight
-                            val segmentHeight = (partHeight*style.heightMultiplier).coerceIn(0f,1.5f)
-                            val bottom=cursor+segmentHeight*gap*.5f
-                            val top=cursor+segmentHeight-segmentHeight*gap*.5f
-                            if(top>bottom) {
-                                fun segmentChannel(shift:Int) =
-                                    ((((style.colorFrom shr shift) and 255).toFloat() +
-                                        (((style.colorTo shr shift) and 255).toFloat()-((style.colorFrom shr shift) and 255).toFloat())*colorProgress)/255f)
-                                val sr=segmentChannel(16); val sg=segmentChannel(8); val sb=segmentChannel(0)
-                                val alpha=config.opacity*config.compositionAlpha*segmentChannel(24)
-                                if (config.glow > 0f) quad(left-.008f,bottom-.008f,right+.008f,top+.008f,sr,sg,sb,alpha*config.glow*.2f,config)
-                                if (config.motionBlurAmount > 0f) quad(left-.006f,bottom,right-.006f,top,sr,sg,sb,alpha*config.motionBlurAmount*.28f,config)
-                                val flip = style.flipOther && i%2==1
-                                shape(style.shape,left,bottom,right,top,sr,sg,sb,alpha,config,flipVertical=flip)
-                                if (style.mirror || config.mirror) shape(style.shape,left,-top,right,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
-                                if (config.mirrorX) shape(style.shape,-right,bottom,-left,top,sr,sg,sb,alpha,config,flipVertical=flip)
-                                if (config.mirrorX && (style.mirror || config.mirror)) shape(style.shape,-right,-top,-left,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
-                            }
-                            cursor += segmentHeight
+                        val previousHeight = previousBarHeights[i]
+                        fun effectChannel(color: Long, shift: Int) = ((color shr shift) and 255).toFloat()/255f
+                        fun drawGlow() {
+                            if (config.glow <= 0f) return
+                            quad(left-.006f,base-.008f,right+.006f,base+height+.008f,
+                                effectChannel(config.blurColor,16),effectChannel(config.blurColor,8),effectChannel(config.blurColor,0),
+                                config.opacity*config.compositionAlpha*config.glow*.22f*effectChannel(config.blurColor,24),config)
                         }
+                        fun drawMotionTrail() {
+                            if (config.motionBlurAmount <= 0f || previousHeight <= 0f) return
+                            val sourceFactor = when (config.motionBlurSource) {
+                                "AudioVolume" -> bands[index].coerceIn(0f,1f)
+                                else -> (kotlin.math.abs(height-previousHeight)/height.coerceAtLeast(.05f)).coerceIn(.15f,1f)
+                            }
+                            val trailOffset = if (config.motionBlurRelativeMotion) .006f+config.motionBlurAmount*.035f*sourceFactor else config.motionBlurAmount*.035f
+                            val trailTop = if (config.motionBlurRelativeMotion) base+previousHeight else base+height*.68f
+                            quad(left-trailOffset,base,right-trailOffset,trailTop,
+                                effectChannel(config.motionBlurColor,16),effectChannel(config.motionBlurColor,8),effectChannel(config.motionBlurColor,0),
+                                config.opacity*config.compositionAlpha*config.motionBlurAmount*.32f*sourceFactor*effectChannel(config.motionBlurColor,24),config)
+                        }
+                        if (config.blurShowSharpUnder) drawGlow()
+                        if (config.motionBlurShowSharpUnder) drawMotionTrail()
+                        val drawSharp = config.blurShowSharp && config.motionBlurShowSharp
+                        if (drawSharp) {
+                            var cursor = base
+                            val defaultSegmentHeight = height / styles.size.coerceAtLeast(1)
+                            styles.forEach { style ->
+                                val partHeight = if (style.fixedHeight > 0f) (style.fixedHeight*.25f).coerceAtMost(1.5f) else defaultSegmentHeight
+                                val segmentHeight = (partHeight*style.heightMultiplier).coerceIn(0f,1.5f)
+                                val bottom=cursor+segmentHeight*gap*.5f
+                                val top=cursor+segmentHeight-segmentHeight*gap*.5f
+                                if(top>bottom) {
+                                    fun segmentChannel(shift:Int) =
+                                        ((((style.colorFrom shr shift) and 255).toFloat() +
+                                            (((style.colorTo shr shift) and 255).toFloat()-((style.colorFrom shr shift) and 255).toFloat())*colorProgress)/255f)
+                                    val sr=segmentChannel(16); val sg=segmentChannel(8); val sb=segmentChannel(0)
+                                    val alpha=config.opacity*config.compositionAlpha*segmentChannel(24)
+                                    val flip = style.flipOther && i%2==1
+                                    shape(style.shape,left,bottom,right,top,sr,sg,sb,alpha,config,flipVertical=flip)
+                                    if (style.mirror || config.mirror) shape(style.shape,left,-top,right,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
+                                    if (config.mirrorX) shape(style.shape,-right,bottom,-left,top,sr,sg,sb,alpha,config,flipVertical=flip)
+                                    if (config.mirrorX && (style.mirror || config.mirror)) shape(style.shape,-right,-top,-left,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
+                                }
+                                cursor += segmentHeight
+                            }
+                        }
+                        if (!config.blurShowSharpUnder) drawGlow()
+                        if (!config.motionBlurShowSharpUnder) drawMotionTrail()
+                        previousBarHeights[i] = height
                     }
                 }
                 if (config.particlesEnabled && config.particleCount > 0) {
