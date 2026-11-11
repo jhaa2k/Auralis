@@ -100,6 +100,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         if (program == 0) return
         val config = settings.sanitized()
+        if (config.barsEnabled) {
         val count = config.barCount
         val slot = 2f / count
         val barWidth = max(0.001f, slot * config.barWidth)
@@ -211,6 +212,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform2f(offsetHandle, 0f, 0f)
         GLES20.glUniform4f(tintHandle, 1f, 1f, 1f, 1f)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
+        }
 
         if (config.particlesEnabled && config.particleCount > 0) {
             val points = particleBuffer ?: return
