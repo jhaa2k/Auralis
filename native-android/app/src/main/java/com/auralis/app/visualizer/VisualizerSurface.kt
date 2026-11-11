@@ -326,8 +326,10 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             fun blurChannel(color: Long, shift: Int) = ((color shr shift) and 0xFF).toFloat() / 255f
             fun drawGlow() {
                 if (config.glow <= 0f) return
+                val glowSpread = 0.002f + config.glowRadius / 100f * 0.04f
                 appendQuad(
-                    x0 - 0.006f, y0 - 0.008f, x1 + 0.006f, y1 + 0.008f,
+                    x0 - glowSpread, y0 - glowSpread * 1.25f,
+                    x1 + glowSpread, y1 + glowSpread * 1.25f,
                     alpha * config.glow * 0.22f * blurChannel(config.blurColor, 24),
                     blurChannel(config.blurColor, 16),
                     blurChannel(config.blurColor, 8),
