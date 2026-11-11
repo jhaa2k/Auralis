@@ -59,7 +59,7 @@ private val modules: Map<String,ModuleSpec> = listOf(
         f("Max Height Scale",SettingKind.SLIDER,"1"), f("Shape Path",SettingKind.DROPDOWN,"HorizontalLine",shapeOptions),
         f("Color Blend Offset",SettingKind.SLIDER,"0"), f("Bars Count",SettingKind.NUMBER,"64"), f("Segments Count",SettingKind.NUMBER,"3"),
         f("Speed",SettingKind.SLIDER,"1"), f("Beat Amount",SettingKind.SLIDER,"0.5")
-    ), segment(1).settings), segment(1), segment(2), segment(3), AccordionSpec("Behavior", listOf(
+    )), segment(1), segment(2), segment(3), AccordionSpec("Behavior", listOf(
         f("Softness",SettingKind.SLIDER,"8"), f("Reaction Delay",SettingKind.SLIDER,"0"),
         f("Reaction Accumulated Delay",SettingKind.SLIDER,"0"), f("Audio Provider Index",SettingKind.NUMBER,"1")
     )))),
