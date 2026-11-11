@@ -213,10 +213,11 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val x1 = min(1f, x0 + barWidth)
             val y0 = -0.94f
             val y1 = y0 + height
+            val colorProgress = (progress + config.colorBlendOffset).let { it - kotlin.math.floor(it) }
             fun channel(shift: Int): Float {
                 val from = ((config.barColorFrom shr shift) and 0xFF).toFloat()
                 val to = ((config.barColorTo shr shift) and 0xFF).toFloat()
-                return (from + (to - from) * progress) / 255f
+                return (from + (to - from) * colorProgress) / 255f
             }
             val red = channel(16)
             val green = channel(8)
@@ -326,7 +327,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     fun styleChannel(shift: Int): Float {
                         val from = ((style.colorFrom shr shift) and 0xFF).toFloat()
                         val to = ((style.colorTo shr shift) and 0xFF).toFloat()
-                        return (from + (to - from) * progress) / 255f
+                        return (from + (to - from) * colorProgress) / 255f
                     }
                     val sr = styleChannel(16)
                     val sg = styleChannel(8)
