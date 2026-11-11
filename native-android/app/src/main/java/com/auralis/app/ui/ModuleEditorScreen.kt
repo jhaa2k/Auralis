@@ -407,7 +407,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 val segmentStyles = (1..3).map { index ->
                     BarSegmentStyle(
                         enabled = flag("segment${index}Enabled", index == 1),
-                        shape = raw("segment${index}Shape", "Rectangle"),
+                        shape = values["$key.segment${index}Shape"] ?: values["${layer.type}.segment${index}Shape"] ?: raw("shapePath", "Rectangle"),
                         colorFrom = argb("segment${index}ColorFrom", 0xFFFFFFFFL),
                         colorTo = argb("segment${index}ColorTo", 0xFF00FFFFL),
                         fixedHeight = number("segment${index}FixedHeight", 0f),
@@ -425,6 +425,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     barHeight = number("heightScale", 1f).coerceIn(0.1f, 2f),
                     barMinHeight = number("minHeightScale", 0f).coerceIn(0f, 1f),
                     flipInput = flag("flipInput"),
+                    colorBlendOffset = number("colorBlendOffset", 0f).coerceIn(0f, 1f),
                     barColorFrom = firstSegment.colorFrom,
                     barColorTo = firstSegment.colorTo,
                     segmentCount = activeSegments.size.coerceAtLeast(1),
