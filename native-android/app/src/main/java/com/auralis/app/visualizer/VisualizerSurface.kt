@@ -52,6 +52,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var bassNoiseFloor = 0.025f
     private var beatPulse = 0f
     private var lastBeatNanos = 0L
+    private val previousBarHeights = mutableMapOf<Int, FloatArray>()
 
     fun submit(values: FloatArray) {
         spectrum = values.copyOf()
@@ -149,7 +150,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             beatPulse *= 0.88f
         }
         previousBassEnergy = previousBassEnergy * 0.72f + bassEnergy * 0.28f
-        configs.forEach { config ->
+        configs.forEachIndexed { layerIndex, config ->
         val positionSignal = measureSignal(config.positionMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val scaleSignal = measureSignal(config.scaleMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val rotationSignal = measureSignal(config.rotationMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
@@ -165,6 +166,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val effectiveRotation = config.rotation + (rotationSignal - 0.5f) * amount * 90f
         val segmentCount = config.segmentCount.coerceIn(1, 32)
         val segmentGap = config.segmentGap.coerceIn(0f, 0.45f)
+        val previousHeights = previousBarHeights[layerIndex]?.takeIf { it.size == count }
+            ?: FloatArray(count).also { previousBarHeights[layerIndex] = it }
         val vertices = FloatArray(count * 66 * 6 * 6)
         var offset = 0
         for (i in 0 until count) {
@@ -211,6 +214,12 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             }
             // Soft expanded underlay approximates a glow without an expensive blur pass.
             if (config.glow > 0f) appendQuad(x0 - 0.006f, y0 - 0.008f, x1 + 0.006f, y1 + 0.008f, alpha * config.glow * 0.22f)
+            val previousTop = y0 + previousHeights[i]
+            if (config.motionBlurAmount > 0f && previousHeights[i] > 0f) {
+                val trailOffset = 0.006f + config.motionBlurAmount * 0.035f
+                appendQuad(x0 - trailOffset, y0, x1 - trailOffset, previousTop, alpha * config.motionBlurAmount * 0.32f)
+            }
+            previousHeights[i] = height
             val segmentHeight = (y1 - y0) / segmentCount
             for (segment in 0 until segmentCount) {
                 val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
