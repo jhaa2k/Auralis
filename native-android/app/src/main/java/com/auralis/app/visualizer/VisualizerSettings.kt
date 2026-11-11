@@ -24,6 +24,7 @@ data class VisualizerSettings(
     val sensitivity: Float = 1f,
     val smoothing: Float = 0.35f,
     val glow: Float = 0.25f,
+    val glowRadius: Float = 2f,
     val opacity: Float = 1f,
     val mirror: Boolean = false,
     val mirrorX: Boolean = false,
