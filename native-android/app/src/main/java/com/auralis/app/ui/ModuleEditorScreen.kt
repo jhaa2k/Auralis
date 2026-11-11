@@ -45,9 +45,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
@@ -954,9 +957,15 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         val size = value("fontSize", "30").toFloatOrNull()?.coerceIn(6f, 300f) ?: 30f
         val color = runCatching { Color(android.graphics.Color.parseColor(value("textColor", "#FFFFFFFF"))) }.getOrDefault(Color.White)
         val opacity = (value("opacityStrength", "1").toFloatOrNull() ?: 1f).coerceIn(0f, 1f)
-        val text = value("textInput", "{ArtistOrTitle}").replace("{ArtistOrTitle}", trackName.substringBeforeLast('.', trackName)).replace("%title%", trackName)
+        val textTemplate = value("textInput", "{ArtistOrTitle}")
+        val useMetadata = value("metadataVariables", "true").toBooleanStrictOrNull() != false
+        val cleanTitle = trackName.substringBeforeLast('.', trackName)
+        val text = if (useMetadata) {
+            textTemplate.replace("{ArtistOrTitle}", cleanTitle).replace("%title%", trackName)
+        } else textTemplate
         val animationType = value("animationType", "None")
-        val animationSpeed = (value("animationSpeed", "1").toFloatOrNull() ?: 1f).coerceIn(0.1f, 5f)
+        val animationSpeed = (value("animationSpeed", "1").toFloatOrNull() ?: 1f).coerceIn(0.1f, 20f)
+        val typewriterSpeed = (value("typewriterSpeed", "1").toFloatOrNull() ?: 1f).coerceIn(0.1f, 20f)
         val transition = rememberInfiniteTransition(label = "text-layer-animation")
         val animationProgress by transition.animateFloat(
             initialValue = 0f, targetValue = 1f,
@@ -969,7 +978,7 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
                 animatedText = ""
                 text.indices.forEach { index ->
                     animatedText = text.take(index + 1)
-                    delay((75f / animationSpeed).toLong().coerceAtLeast(10L))
+                    delay((75f / typewriterSpeed).toLong().coerceAtLeast(10L))
                 }
             } else animatedText = text
         }
@@ -986,6 +995,20 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
             "Justify" -> TextAlign.Justify
             else -> TextAlign.Center
         }
+        val styleName = value("style", "Normal")
+        val isBold = styleName.contains("Bold", ignoreCase = true)
+        val isItalic = styleName.contains("Italic", ignoreCase = true)
+        val weight = if (isBold) FontWeight.Bold else FontWeight(value("fontWeight", "400").toIntOrNull() ?: 400)
+        val shadowColor = runCatching { Color(android.graphics.Color.parseColor(value("shadowColor", "#FF000000"))) }.getOrDefault(Color.Transparent)
+        val shadowX = (value("shadowX", "0").toFloatOrNull() ?: 0f).coerceIn(-100f, 100f)
+        val shadowY = (value("shadowY", "0").toFloatOrNull() ?: 0f).coerceIn(-100f, 100f)
+        val shadowBlur = (value("shadowBlur", "0").toFloatOrNull() ?: 0f).coerceIn(0f, 100f)
+        val lineHeight = (value("lineHeight", "1").toFloatOrNull() ?: 1f).coerceIn(0.5f, 3f)
+        val textStyle = TextStyle(
+            shadow = if (shadowColor.alpha > 0f && (shadowX != 0f || shadowY != 0f || shadowBlur > 0f))
+                Shadow(shadowColor, Offset(shadowX, shadowY), shadowBlur) else null,
+            lineHeight = (size * lineHeight).sp
+        )
         Box(
             modifier = Modifier.align(Alignment.Center).offset {
                 IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight + animationOffset).toInt())
@@ -994,10 +1017,12 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         ) {
             Text(
                 text = animatedText, color = color, fontSize = size.sp,
-                fontFamily = typeface?.let { FontFamily(it) } ?: FontFamily.Default,
+                fontFamily = typeface?.let { FontFamily(it) } ?: FontFamily.SansSerif,
+                fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                fontWeight = weight,
                 textAlign = alignment,
                 letterSpacing = (value("letterSpacing", "0").toFloatOrNull() ?: 0f).sp,
-                fontWeight = FontWeight(value("fontWeight", "400").toIntOrNull() ?: 400)
+                style = textStyle
             )
         }
     }
