@@ -20,14 +20,16 @@ class VisualizerCapture(
     @Volatile private var gain = gain
     @Volatile private var lowFrequencyFraction = lowFrequencyFraction
     @Volatile private var highFrequencyFraction = highFrequencyFraction
+    @Volatile private var measureSource = "Spectrum"
     private var visualizer: Visualizer? = null
     private var smoothed = FloatArray(128)
 
-    fun configure(smoothing: Float, gain: Float, lowFrequencyFraction: Float, highFrequencyFraction: Float) {
+    fun configure(smoothing: Float, gain: Float, lowFrequencyFraction: Float, highFrequencyFraction: Float, measureSource: String = "Spectrum") {
         this.smoothing = smoothing.coerceIn(0f, 0.95f)
         this.gain = gain.coerceIn(0.1f, 4f)
         this.lowFrequencyFraction = lowFrequencyFraction.coerceIn(0f, 0.95f)
         this.highFrequencyFraction = highFrequencyFraction.coerceIn(this.lowFrequencyFraction + 0.05f, 1f)
+        this.measureSource = measureSource
     }
 
     fun start(audioSessionId: Int) {
@@ -69,6 +71,16 @@ class VisualizerCapture(
                                 if (magnitude > peak) peak = magnitude
                             }
                             result[bar] = (ln(1f + peak * gain.coerceIn(0.1f, 4f) * 8f) / ln(9f)).coerceIn(0f, 1f)
+                        }
+                        when (measureSource) {
+                            "Volume" -> {
+                                val aggregate = kotlin.math.sqrt(result.sumOf { it.toDouble() * it.toDouble() } / result.size).toFloat()
+                                result.fill(aggregate)
+                            }
+                            "Peak" -> {
+                                val aggregate = result.maxOrNull() ?: 0f
+                                result.fill(aggregate)
+                            }
                         }
                         for (i in result.indices) {
                             smoothed[i] = smoothed[i] * smoothing.coerceIn(0f, 0.95f) + result[i] * (1f - smoothing.coerceIn(0f, 0.95f))
