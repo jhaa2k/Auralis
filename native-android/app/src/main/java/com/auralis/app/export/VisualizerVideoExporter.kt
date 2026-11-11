@@ -376,9 +376,19 @@ object VisualizerVideoExporter {
                         val randomA = (kotlin.math.abs(sin(seed * 12.9898f) * 43758.5453f) % 1f)
                         val randomB = (kotlin.math.abs(sin(seed * 78.233f) * 19341.381f) % 1f)
                         val life = config.particleLifetime.coerceAtLeast(0.1f)
-                        val phase = (((time / life) + randomA) % 1.0).toFloat().coerceIn(0f, 1f)
+                        val emissionOffset = i.toFloat() * config.particleSpawnTime
+                        val phase = ((((time - emissionOffset) / life) + randomA) % 1.0).toFloat().coerceIn(0f, 1f)
                         val seedAngle = seed * 2.3999632f
                         val radius = kotlin.math.sqrt(randomB)
+                        val cameraDepth = config.particlePerspectiveDepth * (.4f + randomB * .6f)
+                        val perspectiveFactor = (config.particlePerspectiveFov / (config.particlePerspectiveFov + cameraDepth * .1f)).coerceIn(.1f, 1f)
+                        val nearFadeFactor = (cameraDepth / (cameraDepth + config.particleNearCameraFade.coerceAtLeast(0f))).coerceIn(.05f, 1f)
+                        val speedSignal = when (config.particleSpeedMeasure.label) {
+                            "Beat", "VolumeLevelResponsive", "BeatPulseScale" -> energy
+                            "TrackProgressPercentage", "TrackPosition" -> config.trackPositionFraction
+                            else -> .5f
+                        }
+                        val speedFactor = (1f + (speedSignal - .5f) * .8f).coerceIn(.1f, 2f)
                         val spawn = when (config.particleSpawnArea) {
                             "Circle" -> Pair(cos(seedAngle) * radius * config.particleSpread * .5f, sin(seedAngle) * radius * config.particleSpreadY * .5f)
                             "Line" -> Pair((randomA - .5f) * config.particleSpread, 0f)
@@ -390,7 +400,7 @@ object VisualizerVideoExporter {
                         val directionX = cos(direction).toFloat()
                         val directionY = sin(direction).toFloat()
                         val randomSpeed = (1f + (randomA * 2f - 1f) * config.particleSpeedRandom / 10f).coerceAtLeast(0f)
-                        val travel = (phase - .5f) * config.particleSpeed * randomSpeed * .42f
+                        val travel = (phase - .5f) * config.particleSpeed * randomSpeed * speedFactor * perspectiveFactor * .42f
                         var baseX = spawn.first + directionX * travel
                         var baseY = spawn.second + directionY * travel
                         when (config.particleForceField) {
@@ -411,7 +421,9 @@ object VisualizerVideoExporter {
                                 baseY += baseY * force * phase * .55f
                             }
                         }
-                        val wave = sin(phase * config.particleWaveFrequency * 6.2831853f + seedAngle) * config.particleWaveMagnitude * .025f
+                        val waveFrequency = (config.particleWaveFrequency + randomA * config.particleWaveFrequencyRandom).coerceIn(0f, 50f)
+                        val waveMagnitude = (config.particleWaveMagnitude + (randomB * 2f - 1f) * config.particleWaveMagnitudeRandom).coerceIn(0f, 10f)
+                        val wave = sin(phase * waveFrequency * 6.2831853f + seedAngle) * waveMagnitude * .025f
                         baseX += -directionY * wave
                         baseY += directionX * wave
                         val measureOffsetX = (config.particlePositionX - .5f) * 2f
@@ -421,14 +433,15 @@ object VisualizerVideoExporter {
                         val fadeWindow = (config.particleFadeInOutTime / life).coerceIn(0f, .5f)
                         val fadeIn = if (fadeWindow <= 0f) 1f else (phase / fadeWindow).coerceIn(0f, 1f)
                         val fadeOut = if (fadeWindow <= 0f) 1f else ((1f - phase) / fadeWindow).coerceIn(0f, 1f)
-                        val alphaFactor = config.particleOpacity * config.compositionAlpha * (.3f + energy * .7f) * fadeIn * fadeOut
+                        val alphaFactor = config.particleOpacity * config.compositionAlpha * (.3f + energy * .7f) * fadeIn * fadeOut * nearFadeFactor
                         fun mix(shift: Int) = channel(config.particleColor, shift) +
                             (channel(config.particleColorTo, shift) - channel(config.particleColor, shift)) * phase
                         val red = mix(16); val green = mix(8); val blue = mix(0)
                         val alpha = mix(24) * alphaFactor
                         val startSize = if (config.particleFadeInSize > 0f) config.particleFadeInSize else config.particleSize
                         val endSize = (config.particleEndSize + (randomB * 2f - 1f) * config.particleEndSizeRandom).coerceIn(0f, 64f)
-                        val size = (startSize + (endSize - startSize) * phase) * config.particleScale / 160f
+                        val zSizeFactor = 1f + config.particleEndSizeZFactor * (1f - perspectiveFactor) * .05f
+                        val size = (startSize + (endSize - startSize) * phase) * config.particleScale * perspectiveFactor * zSizeFactor / 160f
                         val halfX = size * config.particleSizeAspectRatio
                         val halfY = size
                         val drawAngle = if (config.particleVelocityAngle) Math.toDegrees(direction).toFloat() else config.particleRotation
