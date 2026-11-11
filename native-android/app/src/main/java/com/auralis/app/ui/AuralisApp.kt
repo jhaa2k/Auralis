@@ -149,6 +149,22 @@ fun AuralisApp() {
             .collectLatest { persistModuleProperties(context, it) }
     }
     var nextLayerId by remember { mutableIntStateOf(3) }
+
+    LaunchedEffect(context) {
+        val savedLayers = restoreLayerRegistry(context)
+        if (savedLayers.isNotEmpty()) {
+            editorLayers.clear()
+            editorLayers.addAll(savedLayers.map { EditorLayer(it.id, it.type, it.name) })
+            nextLayerId = (savedLayers.maxOfOrNull { it.id } ?: 0) + 1
+            selectedLayerId = editorLayers.lastOrNull()?.id ?: 1
+        }
+    }
+    LaunchedEffect(context) {
+        snapshotFlow { editorLayers.map { SavedLayerRecord(it.id, it.type, it.name) } }
+            .drop(1)
+            .debounce(600)
+            .collectLatest { persistLayerRegistry(context, it) }
+    }
     var addLayerMenuExpanded by remember { mutableStateOf(false) }
     var fftLower by remember { mutableFloatStateOf(0.02f) }
     var fftUpper by remember { mutableFloatStateOf(0.92f) }
