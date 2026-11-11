@@ -124,6 +124,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     var exportProgress by remember { mutableFloatStateOf(0f) }
     var exportStatus by remember { mutableStateOf("READY TO EXPORT") }
     var isExporting by remember { mutableStateOf(false) }
+    var currentLayerSettings by remember { mutableStateOf(listOf(VisualizerSettings())) }
 
     val audioSessionId by AudioSessionBridge.sessionId.collectAsState()
     var hasAudioPermission by remember {
@@ -175,7 +176,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                             width = dimensions.first,
                             height = dimensions.second,
                             fps = exportFps,
-                            includeAudio = true
+                            includeAudio = true,
+                            visualizerLayers = currentLayerSettings
                         )
                     ) { progress, message ->
                         scope.launch {
@@ -383,7 +385,10 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         }
     }
     val liveSettings = liveLayerSettings.firstOrNull() ?: VisualizerSettings(barsEnabled = false)
-    SideEffect { previewSurface?.updateLayers(liveLayerSettings) }
+    SideEffect {
+        currentLayerSettings = liveLayerSettings
+        previewSurface?.updateLayers(liveLayerSettings)
+    }
     val pageTitle = when (selectedTab) {
         EditorTab.STUDIO -> "LIVE VISUALIZER EDITOR"
         EditorTab.ELEMENTS -> "ADD OR EDIT ELEMENTS"
