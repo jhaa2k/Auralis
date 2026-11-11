@@ -612,74 +612,43 @@ fun AuralisApp() {
                             Text("Live app-audio FFT feeding the OpenGL spectrum renderer.", color = StudioMuted, fontSize = 8.sp)
                         }
                         1 -> {
-                            Text("MODULE CANVAS", color = StudioAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                            Text("SELECT A MODULE TO ADD IT TO THE COMPOSITION", color = StudioMuted, fontSize = 7.sp)
-                            val moduleGrid = listOf(
-                                "COMPOSITION" to "Composition",
-                                "TEXT" to "Text",
-                                "BARS" to "Bars",
-                                "PARTICLES" to "Particles",
-                                "IMAGE" to "Image",
-                                "AUDIOPROVIDER" to "Audio Provider",
-                                "BLUREFFECT" to "Blur Effect",
-                                "RGBSPLITEFFECT" to "RGB Split",
-                                "MOTIONBLUREFFECT" to "Motion Blur",
-                                "MIRROREREFFECT" to "Mirror Effect",
-                                "CUSTOMSHADER" to "Custom Shader"
-                            )
-                            moduleGrid.chunked(2).forEach { gridRow ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                    gridRow.forEach { (label, type) ->
-                                        Surface(
-                                            modifier = Modifier.weight(1f).height(43.dp),
-                                            color = StudioBlack,
-                                            shape = RoundedCornerShape(2.dp),
-                                            border = BorderStroke(1.dp, StudioLine),
-                                            onClick = {
-                                                if (type == "Composition") {
-                                                    selectedLayerId = editorLayers.firstOrNull { it.type == "Composition" }?.id ?: editorLayers.first().id
-                                                } else {
-                                                    val layer = EditorLayer(nextLayerId++, type, if (type == "Bars") "Spectrum Bars" else type)
-                                                    editorLayers.add(layer)
-                                                    selectedLayerId = layer.id
-                                                }
-                                                detailsLayerId = selectedLayerId
-                                                detailsModule = when(type) {
-                                                    "Composition" -> "COMPOSITION"
-                                                    "Text" -> "TEXT"
-                                                    "Bars" -> "BARS"
-                                                    "Particles" -> "PARTICLES"
-                                                    "Image" -> "IMAGE"
-                                                    "Audio Provider" -> "AUDIOPROVIDER"
-                                                    "Blur Effect" -> "BLUREFFECT"
-                                                    "RGB Split" -> "RGBSPLITEFFECT"
-                                                    "Motion Blur" -> "MOTIONBLUREFFECT"
-                                                    "Mirror Effect" -> "MIRROREFFECT"
-                                                    else -> "CUSTOMSHADER"
-                                                }
-                                                selectedTab = if (type == "Audio Provider") 2 else 1
-                                                selectedPropertyCategory = "GENERAL"
-                                            }
-                                        ) {
-                                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                Text(label, color = StudioWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                                            }
-                                        }
-                                    }
-                                    if (gridRow.size == 1) Spacer(Modifier.weight(1f))
-                                }
-                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("LAYER STACK", color = StudioMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                 Spacer(Modifier.weight(1f))
                                 Box {
                                     Button(onClick = { addLayerMenuExpanded = true }, colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack), shape = RoundedCornerShape(2.dp)) { Text("+ ADD ELEMENT", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                                    DropdownMenu(expanded = addLayerMenuExpanded, onDismissRequest = { addLayerMenuExpanded = false }) {
-                                        listOf("Composition", "Text", "Bars", "Particles", "Image", "Blur Effect", "RGB Split", "Motion Blur", "Mirror Effect", "Custom Shader").forEach { type ->
-                                            DropdownMenuItem(text = { Text(type) }, onClick = {
-                                                val layer = EditorLayer(nextLayerId++, type, if (type == "Bars") "Spectrum Bars" else type)
-                                                editorLayers.add(layer); selectedLayerId = layer.id; addLayerMenuExpanded = false
-                                            })
+                                    DropdownMenu(
+                                        expanded = addLayerMenuExpanded,
+                                        onDismissRequest = { addLayerMenuExpanded = false },
+                                        modifier = Modifier.heightIn(max = 420.dp)
+                                    ) {
+                                        listOf(
+                                            "Composition", "Text", "Bars", "Particles", "Image",
+                                            "Audio Provider", "Blur Effect", "RGB Split", "Motion Blur",
+                                            "Mirror Effect", "Custom Shader"
+                                        ).forEach { type ->
+                                            DropdownMenuItem(
+                                                text = { Text(type, fontSize = 12.sp) },
+                                                onClick = {
+                                                    if (type == "Composition") {
+                                                        selectedLayerId = editorLayers.firstOrNull { it.type == "Composition" }?.id
+                                                            ?: editorLayers.first().id
+                                                    } else {
+                                                        val layer = EditorLayer(
+                                                            nextLayerId++,
+                                                            type,
+                                                            if (type == "Bars") "Spectrum Bars" else type
+                                                        )
+                                                        editorLayers.add(layer)
+                                                        selectedLayerId = layer.id
+                                                    }
+                                                    detailsLayerId = selectedLayerId
+                                                    detailsModule = moduleKeyForLayer(type)
+                                                    selectedTab = if (type == "Audio Provider") 2 else 1
+                                                    selectedPropertyCategory = "GENERAL"
+                                                    addLayerMenuExpanded = false
+                                                }
+                                            )
                                         }
                                     }
                                 }
