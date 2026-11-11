@@ -416,10 +416,12 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         val blurEffect = layers.firstOrNull { it.type == "BLUREFFECT" }
         val blurKey = blurEffect?.let { "layer_${it.id}_${it.type}" } ?: "BLUREFFECT"
         val blurEnabled = (values["$blurKey.visible"] ?: values["BLUREFFECT.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+        val blurRadiusValue = if (blurEnabled && blurEffect != null) {
+            (values["$blurKey.blurRadius"] ?: values["BLUREFFECT.blurRadius"] ?: "2").toFloatOrNull()?.coerceIn(0f, 100f) ?: 2f
+        } else 0f
         val blurValue = if (blurEnabled && blurEffect != null) {
-            val radius = (values["$blurKey.blurRadius"] ?: values["BLUREFFECT.blurRadius"] ?: "2").toFloatOrNull() ?: 2f
             val multiplier = (values["$blurKey.blurMultiplier"] ?: values["BLUREFFECT.blurMultiplier"] ?: "4.1").toFloatOrNull() ?: 4.1f
-            (radius * multiplier / 100f).coerceIn(0f, 1f)
+            (multiplier / 10f).coerceIn(0f, 1f)
         } else 0f
         val blurColor = runCatching {
             android.graphics.Color.parseColor(values["$blurKey.color"] ?: values["BLUREFFECT.color"] ?: "#FFFFFFFF").toLong() and 0xFFFFFFFFL
@@ -476,6 +478,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     smoothing = number("softness", 0.35f).coerceIn(0f, 0.95f),
                     opacity = number("alpha", 1f).coerceIn(0f, 1f),
                     glow = blurValue.coerceIn(0f, 1f),
+                    glowRadius = blurRadiusValue,
                     blurColor = blurColor,
                     blurShowSharp = blurShowSharp,
                     blurShowSharpUnder = blurShowSharpUnder,
