@@ -189,7 +189,9 @@ object VisualizerVideoExporter {
         fun draw(bands: FloatArray, layers: List<VisualizerSettings>) {
             val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
             val requiredFloats = configs.sumOf { layer ->
-                val bars = if (layer.barsEnabled) layer.barCount.coerceIn(16,128) * (layer.segmentCount.coerceIn(1,32) * 4 + 2) * 36 else 0
+                val segmentStyles = layer.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
+                val bars = if (layer.barsEnabled) layer.barCount.coerceIn(16,128) *
+                    (segmentStyles.size * 20 + 4) * 18 else 0
                 val particleMirrors = 1 + (if (layer.particleMirrorX) 1 else 0) +
                     (if (layer.particleMirrorY) 1 else 0) +
                     (if (layer.particleMirrorX && layer.particleMirrorY) 1 else 0)
@@ -205,42 +207,103 @@ object VisualizerVideoExporter {
             GLES20.glClearColor(((background shr 16) and 255).toFloat()/255f, ((background shr 8) and 255).toFloat()/255f, (background and 255).toFloat()/255f, ((background shr 24) and 255).toFloat()/255f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val time = System.nanoTime() / 1_000_000_000.0
-            fun quad(left: Float, bottom: Float, right: Float, top: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings, rotationOffset: Float = 0f) {
+            fun vertex(x: Float, y: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings, rotationOffset: Float = 0f) {
                 val angle = Math.toRadians((config.rotation + rotationOffset).toDouble())
                 val cs = cos(angle).toFloat(); val sn = sin(angle).toFloat()
                 val cx = (config.positionX - .5f) * 2f; val cy = (.5f - config.positionY) * 2f
-                val pts = floatArrayOf(left,bottom,right,bottom,right,top,left,bottom,right,top,left,top)
-                for (i in 0 until 6) {
-                    val x = pts[i*2] * config.scale; val y = pts[i*2+1] * config.scale
-                    buf.put(x*cs-y*sn+cx); buf.put(x*sn+y*cs+cy)
-                    buf.put(red); buf.put(green); buf.put(blue); buf.put(alpha)
+                val sx = x * config.scale; val sy = y * config.scale
+                buf.put(sx*cs-sy*sn+cx); buf.put(sx*sn+sy*cs+cy)
+                buf.put(red); buf.put(green); buf.put(blue); buf.put(alpha)
+            }
+            fun triangle(
+                ax: Float, ay: Float, bx: Float, by: Float, cx: Float, cy: Float,
+                red: Float, green: Float, blue: Float, alpha: Float,
+                config: VisualizerSettings, rotationOffset: Float = 0f
+            ) {
+                vertex(ax,ay,red,green,blue,alpha,config,rotationOffset)
+                vertex(bx,by,red,green,blue,alpha,config,rotationOffset)
+                vertex(cx,cy,red,green,blue,alpha,config,rotationOffset)
+            }
+            fun quad(
+                left: Float, bottom: Float, right: Float, top: Float,
+                red: Float, green: Float, blue: Float, alpha: Float,
+                config: VisualizerSettings, rotationOffset: Float = 0f
+            ) {
+                triangle(left,bottom,right,bottom,right,top,red,green,blue,alpha,config,rotationOffset)
+                triangle(left,bottom,right,top,left,top,red,green,blue,alpha,config,rotationOffset)
+            }
+            fun polygon(
+                left: Float, bottom: Float, right: Float, top: Float, sides: Int,
+                red: Float, green: Float, blue: Float, alpha: Float,
+                config: VisualizerSettings, star: Boolean = false, rotationOffset: Float = 0f
+            ) {
+                val cx = (left + right) * .5f; val cy = (bottom + top) * .5f
+                val rx = (right - left) * .5f; val ry = (top - bottom) * .5f
+                val points = ArrayList<Pair<Float,Float>>(sides)
+                for (index in 0 until sides) {
+                    val a = -PI/2.0 + index * PI * 2.0 / sides
+                    val radius = if (star && index % 2 == 1) .42f else 1f
+                    points.add(Pair(cx + cos(a).toFloat()*rx*radius, cy + sin(a).toFloat()*ry*radius))
+                }
+                points.indices.forEach { index ->
+                    val p0 = points[index]; val p1 = points[(index+1)%points.size]
+                    triangle(cx,cy,p0.first,p0.second,p1.first,p1.second,red,green,blue,alpha,config,rotationOffset)
+                }
+            }
+            fun shape(
+                name: String, left: Float, bottom: Float, right: Float, top: Float,
+                red: Float, green: Float, blue: Float, alpha: Float,
+                config: VisualizerSettings, rotationOffset: Float = 0f
+            ) {
+                when (name) {
+                    "None" -> Unit
+                    "Line", "HorizontalLine" -> quad(left,(bottom+top)*.5f-.0035f,right,(bottom+top)*.5f+.0035f,red,green,blue,alpha,config,rotationOffset)
+                    "VerticalLine" -> quad((left+right)*.5f-.0035f,bottom,(left+right)*.5f+.0035f,top,red,green,blue,alpha,config,rotationOffset)
+                    "Circle", "Oval" -> polygon(left,bottom,right,top,20,red,green,blue,alpha,config,rotationOffset=rotationOffset)
+                    "Triangle" -> polygon(left,bottom,right,top,3,red,green,blue,alpha,config,rotationOffset=rotationOffset)
+                    "Star", "Heart" -> polygon(left,bottom,right,top,10,red,green,blue,alpha,config,star=true,rotationOffset=rotationOffset)
+                    "Pentagon" -> polygon(left,bottom,right,top,5,red,green,blue,alpha,config,rotationOffset=rotationOffset)
+                    "Hexagon", "SidedPolygon" -> polygon(left,bottom,right,top,6,red,green,blue,alpha,config,rotationOffset=rotationOffset)
+                    "Square" -> {
+                        val side = minOf(right-left,top-bottom); val cx=(left+right)*.5f
+                        quad(cx-side*.5f,bottom,cx+side*.5f,bottom+side,red,green,blue,alpha,config,rotationOffset)
+                    }
+                    else -> quad(left,bottom,right,top,red,green,blue,alpha,config,rotationOffset)
                 }
             }
             configs.forEach { config ->
                 if (config.barsEnabled) {
                     val count = config.barCount.coerceIn(16,128)
                     val slot = 2f/count; val width = slot*config.barWidth.coerceIn(.15f,1f)
-                    val gap = config.segmentGap.coerceIn(0f,.45f); val segments = config.segmentCount.coerceIn(1,32)
+                    val gap = config.segmentGap.coerceIn(0f,.45f)
+                    val styles = config.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
                     for (i in 0 until count) {
                         val progress = i.toFloat()/(count-1).coerceAtLeast(1)
                         val index = ((if(config.flipInput) 1f-progress else progress)*(bands.size-1)).toInt().coerceIn(0,bands.lastIndex)
                         val height = (config.barMinHeight + bands[index]*config.sensitivity*config.barHeight*.88f).coerceIn(.005f,1.5f)
-                        val from = config.barColorFrom; val to = config.barColorTo
-                        fun channel(shift:Int) = ((((from shr shift) and 255).toFloat() + (((to shr shift) and 255).toFloat()-((from shr shift) and 255).toFloat())*progress)/255f)
-                        val r=channel(16); val g=channel(8); val bl=channel(0); val alpha=config.opacity*channel(24)
                         val left=-1f+i*slot+(slot-width)*.5f; val right=left+width; val base=-.94f
-                        val segH=height/segments
-                        for (segment in 0 until segments) {
-                            val bottom=base+segment*segH+segH*gap*.5f
-                            val top=base+(segment+1)*segH-segH*gap*.5f
+                        var cursor = base
+                        val defaultSegmentHeight = height / styles.size.coerceAtLeast(1)
+                        styles.forEachIndexed { segmentIndex, style ->
+                            val partHeight = if (style.fixedHeight > 0f) (style.fixedHeight*.25f).coerceAtMost(1.5f) else defaultSegmentHeight
+                            val segmentHeight = (partHeight*style.heightMultiplier).coerceIn(0f,1.5f)
+                            val bottom=cursor+segmentHeight*gap*.5f
+                            val top=cursor+segmentHeight-segmentHeight*gap*.5f
                             if(top>bottom) {
-                                if (config.glow > 0f) quad(left-.008f,bottom-.008f,right+.008f,top+.008f,r,g,bl,alpha*config.glow*.2f,config)
-                                if (config.motionBlurAmount > 0f) quad(left-.006f,bottom,right-.006f,top,r,g,bl,alpha*config.motionBlurAmount*.28f,config)
-                                quad(left,bottom,right,top,r,g,bl,alpha,config)
-                                if(config.mirror) quad(left,-top,right,-bottom,r,g,bl,alpha,config)
-                                if(config.mirrorX) quad(-right,bottom,-left,top,r,g,bl,alpha,config)
-                                if(config.mirror && config.mirrorX) quad(-right,-top,-left,-bottom,r,g,bl,alpha,config)
+                                fun segmentChannel(shift:Int) =
+                                    ((((style.colorFrom shr shift) and 255).toFloat() +
+                                        (((style.colorTo shr shift) and 255).toFloat()-((style.colorFrom shr shift) and 255).toFloat())*progress)/255f)
+                                val sr=segmentChannel(16); val sg=segmentChannel(8); val sb=segmentChannel(0)
+                                val alpha=config.opacity*segmentChannel(24)
+                                if (config.glow > 0f) quad(left-.008f,bottom-.008f,right+.008f,top+.008f,sr,sg,sb,alpha*config.glow*.2f,config)
+                                if (config.motionBlurAmount > 0f) quad(left-.006f,bottom,right-.006f,top,sr,sg,sb,alpha*config.motionBlurAmount*.28f,config)
+                                val flip = if (style.flipOther && i%2==1) 180f else 0f
+                                shape(style.shape,left,bottom,right,top,sr,sg,sb,alpha,config,flip)
+                                if (style.mirror || config.mirror) shape(style.shape,left,-top,right,-bottom,sr,sg,sb,alpha,config,flip)
+                                if (config.mirrorX) shape(style.shape,-right,bottom,-left,top,sr,sg,sb,alpha,config,flip)
+                                if (config.mirrorX && (style.mirror || config.mirror)) shape(style.shape,-right,-top,-left,-bottom,sr,sg,sb,alpha,config,flip)
                             }
+                            cursor += segmentHeight
                         }
                     }
                 }
