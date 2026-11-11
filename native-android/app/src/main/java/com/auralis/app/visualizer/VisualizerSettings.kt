@@ -123,6 +123,7 @@ data class VisualizerSettings(
         sensitivity = sensitivity.coerceIn(0.1f, 4f),
         smoothing = smoothing.coerceIn(0f, 0.95f),
         glow = glow.coerceIn(0f, 1f),
+        glowRadius = glowRadius.coerceIn(0f, 100f),
         opacity = opacity.coerceIn(0f, 1f),
         positionX = positionX.coerceIn(-1f, 2f),
         positionY = positionY.coerceIn(-1f, 2f),
