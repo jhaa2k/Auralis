@@ -574,7 +574,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 particleScaleMeasure = measureScale,
                 particleRotationMeasure = measureRotation,
                 particleMeasureAmount = number("measureAmount", 0.5f),
-                beatSensitivity = number("beatRangeValueLower", 0.55f).coerceIn(0f, 1f)
+                beatSensitivity = number("beatSensitivity", 0.55f).coerceIn(0f, 1f)
             )
             else -> null
         }
