@@ -140,8 +140,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val bassEnergy = if (bassBins > 0) data.take(bassBins).average().toFloat() else 0f
         bassNoiseFloor = bassNoiseFloor * 0.985f + min(bassEnergy, bassNoiseFloor * 1.8f) * 0.015f
         val beatThreshold = (0.12f - beatConfig.beatSensitivity * 0.075f).coerceIn(0.045f, 0.12f)
-        val adaptiveFloor = max(beatThreshold, bassNoiseFloor * (2.0f - config.beatSensitivity * 0.65f))
-        val onsetRatio = 1.48f - config.beatSensitivity * 0.40f
+        val adaptiveFloor = max(beatThreshold, bassNoiseFloor * (2.0f - beatConfig.beatSensitivity * 0.65f))
+        val onsetRatio = 1.48f - beatConfig.beatSensitivity * 0.40f
         if (bassEnergy > adaptiveFloor && bassEnergy > previousBassEnergy * onsetRatio && nowNanos - lastBeatNanos > 200_000_000L) {
             beatPulse = 1f
             lastBeatNanos = nowNanos
