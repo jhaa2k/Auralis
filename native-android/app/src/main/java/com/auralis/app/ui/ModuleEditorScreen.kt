@@ -40,12 +40,12 @@ import com.auralis.app.playback.AuralisPlaybackService
 import com.auralis.app.visualizer.*
 import kotlinx.coroutines.delay
 
-private val EditorBackground = Color(0xFF090B0E)
-private val EditorPanel = Color(0xFF14181E)
-private val EditorLine = Color(0xFF252B33)
-private val EditorText = Color(0xFFF3F5F7)
-private val EditorMuted = Color(0xFF929BA6)
-private val EditorAccent = Color(0xFF53D8E8)
+private val EditorBackground = Color(0xFF101116)
+private val EditorPanel = Color(0xFF181A21)
+private val EditorLine = Color(0xFF2B2E38)
+private val EditorText = Color(0xFFF2F3F7)
+private val EditorMuted = Color(0xFF9298A6)
+private val EditorAccent = Color(0xFFFF9A6B)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -185,7 +185,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         ) {
             // Fixed preview zone: it never scrolls and contains no floating property controls.
             Column(
-                modifier = Modifier.fillMaxWidth().weight(0.34f).background(Color(0xFF050607)).padding(horizontal = 10.dp, vertical = 7.dp)
+                modifier = Modifier.fillMaxWidth().weight(2f).background(Color(0xFF0D0F14)).padding(horizontal = 10.dp, vertical = 7.dp)
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("LIVE PREVIEW", color = EditorText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
@@ -193,8 +193,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     Text(audioStatus, color = EditorAccent, style = MaterialTheme.typography.labelSmall)
                 }
                 Box(
-                    Modifier.fillMaxWidth().weight(1f).padding(top = 5.dp).clip(RoundedCornerShape(5.dp))
-                        .background(Color(0xFF0B1016))
+                    Modifier.fillMaxWidth().weight(1f).padding(top = 5.dp).clip(RoundedCornerShape(3.dp))
+                        .background(Color(0xFF000000))
                 ) {
                     AndroidView(
                         factory = { viewContext ->
@@ -218,29 +218,52 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                         )
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(42.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Outlined.AudioFile, contentDescription = null, tint = EditorAccent, modifier = Modifier.size(18.dp))
-                    Text(selectedAudioName, color = EditorMuted, style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.weight(1f))
-                    Text(formatEditorTime(playbackPosition) + " / " + formatEditorTime(playbackDuration), color = EditorMuted, style = MaterialTheme.typography.labelSmall)
-                    FilledTonalIconButton(
-                        onClick = { if (mediaController?.isPlaying == true) mediaController?.pause() else mediaController?.play() },
-                        enabled = mediaController != null,
-                        modifier = Modifier.size(34.dp)
-                    ) {
-                        Icon(if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow, contentDescription = "Play or pause")
-                    }
-                    TextButton(onClick = { audioPicker.launch(arrayOf("audio/*")) }) { Text("IMPORT", color = EditorAccent) }
-                }
             }
 
             // Independent bottom scroll region: only this area moves when browsing properties.
             Column(
-                modifier = Modifier.fillMaxWidth().weight(0.66f).background(EditorBackground)
+                modifier = Modifier.fillMaxWidth().weight(3f).background(Color(0xFF13151C))
             ) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("PLAYBACK & TIMELINE", color = EditorMuted, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
+                        Text("● LIVE PREVIEW", color = Color(0xFF75C99B), style = MaterialTheme.typography.labelSmall)
+                    }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                        color = Color(0xFF1A1D26),
+                        shape = RoundedCornerShape(7.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, EditorLine)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            Icon(Icons.Outlined.AudioFile, contentDescription = null, tint = EditorAccent, modifier = Modifier.size(18.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(selectedAudioName, color = EditorText, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                                Text(formatEditorTime(playbackPosition) + " / " + formatEditorTime(playbackDuration), color = EditorMuted, style = MaterialTheme.typography.labelSmall)
+                            }
+                            FilledTonalIconButton(
+                                onClick = { if (mediaController?.isPlaying == true) mediaController?.pause() else mediaController?.play() },
+                                enabled = mediaController != null,
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow, contentDescription = "Play or pause")
+                            }
+                            TextButton(onClick = { audioPicker.launch(arrayOf("audio/*")) }) { Text("IMPORT", color = EditorAccent) }
+                        }
+                    }
+                    Text(
+                        if (module == null) "ELEMENTS & TOOLS" else "${module.title} · PROPERTIES",
+                        modifier = Modifier.padding(top = 7.dp),
+                        color = EditorMuted,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 if (module == null) {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -249,7 +272,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     ) {
                         item {
                             Text("MODULE LIBRARY", color = EditorAccent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                            Text("Select a module. Preview stays fixed above while these controls scroll.", color = EditorMuted, style = MaterialTheme.typography.bodySmall)
+                            Text("Choose an element. The canvas stays pinned while this dock scrolls.", color = EditorMuted, style = MaterialTheme.typography.bodySmall)
                         }
                         items(ModuleCatalog.modules.chunked(2)) { row ->
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -279,7 +302,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     ) {
                         item {
                             Text("PROPERTY CONTROLS", color = EditorAccent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                            Text("Scroll here to edit. Preview remains locked above.", color = EditorMuted, style = MaterialTheme.typography.bodySmall)
+                            Text("Fixed preview above · scroll this control dock to edit properties.", color = EditorMuted, style = MaterialTheme.typography.bodySmall)
                         }
                         items(module.groups, key = { it.title }) { group ->
                             val expanded = expandedGroup == group.title
