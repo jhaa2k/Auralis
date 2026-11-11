@@ -21,7 +21,7 @@ private val StudioScheme = darkColorScheme(
 fun AuralisTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = StudioScheme,
-        typography = androidx.compose.material3.Typography(defaultFontFamily = FontFamily.SansSerif),
+        typography = androidx.compose.material3.Typography(fontFamily = FontFamily.SansSerif),
         content = content
     )
 }
