@@ -886,6 +886,7 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         val rotation = value("rotation", "0").toFloatOrNull() ?: 0f
         val size = value("fontSize", "30").toFloatOrNull()?.coerceIn(6f, 300f) ?: 30f
         val color = runCatching { Color(android.graphics.Color.parseColor(value("textColor", "#FFFFFFFF"))) }.getOrDefault(Color.White)
+        val opacity = (value("opacityStrength", "1").toFloatOrNull() ?: 1f).coerceIn(0f, 1f)
         val text = value("textInput", "{ArtistOrTitle}").replace("{ArtistOrTitle}", trackName.substringBeforeLast('.', trackName)).replace("%title%", trackName)
         val alignment = when (value("alignment", "Center")) {
             "Left" -> TextAlign.Start
@@ -896,7 +897,7 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         Box(
             modifier = Modifier.align(Alignment.Center).offset {
                 IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight).toInt())
-            }.graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f), scaleY = sy.coerceIn(0.05f, 8f), rotationZ = rotation),
+            }.graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f), scaleY = sy.coerceIn(0.05f, 8f), rotationZ = rotation, alpha = opacity),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -904,7 +905,7 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
                 fontFamily = typeface?.let { FontFamily(it) } ?: FontFamily.Default,
                 textAlign = alignment,
                 letterSpacing = (value("letterSpacing", "0").toFloatOrNull() ?: 0f).sp,
-                fontWeight = if (value("fontWeight", "400").toIntOrNull()?.let { it >= 700 } == true) FontWeight.Bold else FontWeight.Normal
+                fontWeight = FontWeight(value("fontWeight", "400").toIntOrNull() ?: 400)
             )
         }
     }
