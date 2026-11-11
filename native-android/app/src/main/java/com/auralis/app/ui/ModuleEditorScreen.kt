@@ -445,6 +445,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 particleSpawnArea = raw("spawnArea", "Rectangle"),
                 particleForceField = raw("forceField", "None"),
                 particleVectorAngle = number("vectorAngle", 270f),
+                particleVectorAngleZ = number("vectorAngleZ", 0f),
                 particleRandomVector = flag("randomVector"),
                 particleVectorRelative = flag("vectorRelative"),
                 particleSpeedRandom = number("speedRandom", 0f),
