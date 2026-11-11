@@ -258,7 +258,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             }
             fun appendPolygon(
                 left: Float, bottom: Float, right: Float, top: Float,
-                sides: Int, a: Float, r: Float, g: Float, b: Float, star: Boolean = false
+                sides: Int, a: Float, r: Float, g: Float, b: Float, star: Boolean = false, flipVertical: Boolean = false
             ) {
                 val cx = (left + right) * 0.5f
                 val cy = (bottom + top) * 0.5f
@@ -270,7 +270,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     val radius = if (star && point % 2 == 1) 0.42f else 1f
                     points.add(Pair(
                         cx + cos(angle).toFloat() * rx * radius,
-                        cy + sin(angle).toFloat() * ry * radius
+                        cy + (if (flipVertical) -1f else 1f) * sin(angle).toFloat() * ry * radius
                     ))
                 }
                 for (point in points.indices) {
@@ -281,7 +281,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             }
             fun appendShape(
                 shape: String, left: Float, bottom: Float, right: Float, top: Float,
-                a: Float, r: Float, g: Float, b: Float
+                a: Float, r: Float, g: Float, b: Float, flipVertical: Boolean = false
             ) {
                 when (shape) {
                     "None" -> Unit
@@ -290,15 +290,15 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     "VerticalLine" ->
                         appendQuad((left + right) * .5f - .0035f, bottom, (left + right) * .5f + .0035f, top, a, r, g, b)
                     "Circle", "Oval" ->
-                        appendPolygon(left, bottom, right, top, 20, a, r, g, b)
+                        appendPolygon(left, bottom, right, top, 20, a, r, g, b, flipVertical = flipVertical)
                     "Triangle" ->
-                        appendPolygon(left, bottom, right, top, 3, a, r, g, b)
+                        appendPolygon(left, bottom, right, top, 3, a, r, g, b, flipVertical = flipVertical)
                     "Star", "Heart" ->
-                        appendPolygon(left, bottom, right, top, 10, a, r, g, b, star = true)
+                        appendPolygon(left, bottom, right, top, 10, a, r, g, b, star = true, flipVertical = flipVertical)
                     "Pentagon" ->
-                        appendPolygon(left, bottom, right, top, 5, a, r, g, b)
+                        appendPolygon(left, bottom, right, top, 5, a, r, g, b, flipVertical = flipVertical)
                     "Hexagon", "SidedPolygon" ->
-                        appendPolygon(left, bottom, right, top, 6, a, r, g, b)
+                        appendPolygon(left, bottom, right, top, 6, a, r, g, b, flipVertical = flipVertical)
                     "Square" -> {
                         val side = min(right - left, top - bottom)
                         val cx = (left + right) * .5f
@@ -336,16 +336,13 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     val sg = styleChannel(8)
                     val sb = styleChannel(0)
                     val sa = alpha * styleChannel(24)
-                    fun drawAt(left: Float, bottom: Float, right: Float, top: Float) {
-                        appendShape(style.shape, left, bottom, right, top, sa, sr, sg, sb)
+                    fun drawAt(left: Float, bottom: Float, right: Float, top: Float, flip: Boolean = false) {
+                        appendShape(style.shape, left, bottom, right, top, sa, sr, sg, sb, flipVertical = flip)
                     }
-                    drawAt(x0, segmentBottom, x1, segmentTop)
-                    if (style.mirror || config.mirror) drawAt(x0, -segmentTop, x1, -segmentBottom)
-                    if (config.mirrorX) drawAt(-x1, segmentBottom, -x0, segmentTop)
-                    if (config.mirrorX && (style.mirror || config.mirror)) drawAt(-x1, -segmentTop, -x0, -segmentBottom)
-                    if (style.flipOther && i % 2 == 1) {
-                        drawAt(-x1, segmentBottom, -x0, segmentTop)
-                    }
+                    drawAt(x0, segmentBottom, x1, segmentTop, style.flipOther && i % 2 == 1)
+                    if (style.mirror || config.mirror) drawAt(x0, -segmentTop, x1, -segmentBottom, style.flipOther && i % 2 == 1)
+                    if (config.mirrorX) drawAt(-x1, segmentBottom, -x0, segmentTop, style.flipOther && i % 2 == 1)
+                    if (config.mirrorX && (style.mirror || config.mirror)) drawAt(-x1, -segmentTop, -x0, -segmentBottom, style.flipOther && i % 2 == 1)
                 }
                 segmentCursor += actualHeight
             }
