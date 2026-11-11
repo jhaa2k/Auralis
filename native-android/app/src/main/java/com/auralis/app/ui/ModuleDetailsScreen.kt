@@ -153,7 +153,8 @@ internal fun ModuleDetailsScreen(
     values: MutableMap<String,String>,
     onBack: () -> Unit,
     onReset: () -> Unit,
-    onPickImage: (String) -> Unit
+    onPickImage: (String) -> Unit,
+    onPropertyChange: (String, String, String) -> Unit
 ) {
     val spec = modules[module] ?: modules["BARS"]!!
     var expanded by remember(module, layerId) { mutableStateOf(spec.groups.firstOrNull()?.title.orEmpty()) }
@@ -164,7 +165,7 @@ internal fun ModuleDetailsScreen(
         if (!values.containsKey(key)) values[key] = field.defaultValue
         return values[key] ?: field.defaultValue
     }
-    fun write(group: AccordionSpec, field: SettingSpec, value: String) { values[prefix + group.title + "/" + field.name] = value }
+    fun write(group: AccordionSpec, field: SettingSpec, value: String) { values[prefix + group.title + "/" + field.name] = value; onPropertyChange(group.title, field.name, value) }
     Column(Modifier.fillMaxSize().background(StudioBlack).padding(14.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("‹", color = StudioWhite, fontSize = 28.sp, modifier = Modifier.clickable { onBack() }.padding(end=16.dp))
@@ -256,6 +257,6 @@ internal fun ModuleDetailsScreen(
             }
         }
     }
-    if(info) AlertDialog(onDismissRequest={info=false},confirmButton={TextButton(onClick={info=false}){Text("OK")}},title={Text(spec.title)},text={Text("Settings are stored per layer. A property affects the live preview only when the corresponding renderer consumes it; unconnected values remain editable and saved in this in-memory editor model.")})
+    if(info) AlertDialog(onDismissRequest={info=false},confirmButton={TextButton(onClick={info=false}){Text("OK")}},title={Text(spec.title)},text={Text("Settings are saved locally per layer. General transforms and supported layer properties update the live preview; advanced effects remain editable and persisted until their dedicated renderer is connected.")})
 }
 
