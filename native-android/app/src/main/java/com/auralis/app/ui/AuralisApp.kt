@@ -600,7 +600,7 @@ fun AuralisApp() {
                                 "BLUREFFECT" to "Blur Effect",
                                 "RGBSPLITEFFECT" to "RGB Split",
                                 "MOTIONBLUREFFECT" to "Motion Blur",
-                                "MIRROREFFECT" to "Mirror Effect",
+                                "MIRROREREFFECT" to "Mirror Effect",
                                 "CUSTOMSHADER" to "Custom Shader"
                             )
                             moduleGrid.chunked(2).forEach { gridRow ->
