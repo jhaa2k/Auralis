@@ -173,7 +173,7 @@ object VisualizerVideoExporter {
 
     private class GlSurface(input:android.view.Surface,w:Int,h:Int) {
         val display=EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);private val context:android.opengl.EGLContext;val surface:android.opengl.EGLSurface
-        private val program:Int;private val p:Int;private val col:Int;private val offsetHandle:Int;private val tintHandle:Int;private var buf:FloatBuffer;private val previousBarHeights = FloatArray(128)
+        private val program:Int;private val p:Int;private val col:Int;private val offsetHandle:Int;private val tintHandle:Int;private var buf:FloatBuffer;private val previousBarHeights = FloatArray(128);private var previousEnergy = 0f
         init {
             val v=IntArray(2);check(EGL14.eglInitialize(display,v,0,v,1))
             val attrs=intArrayOf(EGL14.EGL_RED_SIZE,8,EGL14.EGL_GREEN_SIZE,8,EGL14.EGL_BLUE_SIZE,8,EGL14.EGL_ALPHA_SIZE,8,EGL14.EGL_RENDERABLE_TYPE,EGL14.EGL_OPENGL_ES2_BIT,0x3142,1,EGL14.EGL_NONE)
@@ -218,6 +218,33 @@ object VisualizerVideoExporter {
             )
             if (composition.clearCanvas) GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val time = System.nanoTime() / 1_000_000_000.0
+            val energy = bands.average().toFloat().coerceIn(0f, 1f)
+            val beatPulse = ((energy - previousEnergy) * 4f).coerceIn(0f, 1f)
+            previousEnergy = previousEnergy * .72f + energy * .28f
+            fun measureValue(name: String, elapsed: Float, currentEnergy: Float, beat: Float, trackPosition: Float): Float {
+                val phase = elapsed * .7f
+                return when (name) {
+                    "Beat" -> .5f + beat * .5f
+                    "TotalTime" -> (elapsed * .25f) % 1f
+                    "TotalTimeBackward" -> 1f - ((elapsed * .25f) % 1f)
+                    "TotalTimeWhenPlaying" -> if (currentEnergy > .015f) (elapsed * .25f) % 1f else .5f
+                    "TotalTimeAndBeat" -> (((elapsed * .25f) % 1f) * .65f + beat * .35f).coerceIn(0f, 1f)
+                    "TrackPosition", "TrackProgressPercentage" -> trackPosition
+                    "BeatRandomShake" -> .5f + beat * sin(elapsed * 37f) * .5f
+                    "BeatCamShakeRotMore", "BeatCamShakeOnly", "BeatTriggerAnim", "BeatPulseScale",
+                    "BeatFlashColor", "BeatGlowIntensity", "BeatHorizontalStretch", "BeatVerticalBounce" -> .5f + beat * .5f
+                    "BeatCamShakeRotLess" -> .5f - beat * .5f
+                    "ConstantShakeRotMore" -> .5f + sin(phase * 19f) * .5f
+                    "ConstantShakeRotLess" -> .5f - sin(phase * 19f) * .5f
+                    "ConstantSlowRotate" -> (elapsed * .08f) % 1f
+                    "ConstantOrbitMove" -> .5f + sin(elapsed * .35f) * .5f
+                    "ConstantLinearScroll" -> (elapsed * .12f) % 1f
+                    "TrackRemainingTime" -> 1f - trackPosition
+                    "TrackIntroOutroTrigger" -> if (trackPosition < .08f || trackPosition > .92f) .5f + beat * .5f else .5f
+                    "VolumeLevelResponsive", "PitchFrequencyResponsive" -> currentEnergy
+                    else -> .5f
+                }.coerceIn(0f, 1f)
+            }
             fun vertex(x: Float, y: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings, rotationOffset: Float = 0f) {
                 val angle = Math.toRadians((config.rotation + rotationOffset).toDouble())
                 val cs = cos(angle).toFloat(); val sn = sin(angle).toFloat()
@@ -383,11 +410,9 @@ object VisualizerVideoExporter {
                         val cameraDepth = config.particlePerspectiveDepth * (.4f + randomB * .6f)
                         val perspectiveFactor = (config.particlePerspectiveFov / (config.particlePerspectiveFov + cameraDepth * .1f)).coerceIn(.1f, 1f)
                         val nearFadeFactor = (cameraDepth / (cameraDepth + config.particleNearCameraFade.coerceAtLeast(0f))).coerceIn(.05f, 1f)
-                        val speedSignal = when (config.particleSpeedMeasure.label) {
-                            "Beat", "VolumeLevelResponsive", "BeatPulseScale" -> energy
-                            "TrackProgressPercentage", "TrackPosition" -> config.trackPositionFraction
-                            else -> .5f
-                        }
+                        val speedSignal = measureValue(
+                            config.particleSpeedMeasure.label, time.toFloat(), energy, beatPulse, config.trackPositionFraction
+                        )
                         val speedFactor = (1f + (speedSignal - .5f) * .8f).coerceIn(.1f, 2f)
                         val spawn = when (config.particleSpawnArea) {
                             "Circle" -> Pair(cos(seedAngle) * radius * config.particleSpread * .5f, sin(seedAngle) * radius * config.particleSpreadY * .5f)
