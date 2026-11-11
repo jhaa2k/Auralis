@@ -101,9 +101,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         if (program == 0) return
         val config = settings.sanitized()
         val count = config.barCount
-        val gap = 0.28f / count
         val slot = 2f / count
-        val barWidth = max(0.001f, slot - gap)
+        val barWidth = max(0.001f, slot * config.barWidth)
+        val horizontalInset = (slot - barWidth) * 0.5f
         val data = spectrum
         val nowNanos = System.nanoTime()
         val elapsedSeconds = ((nowNanos - rendererStartNanos) / 1_000_000_000.0).toFloat()
@@ -133,8 +133,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         for (i in 0 until count) {
             val sourceIndex = (i.toFloat() / count * data.size).toInt().coerceIn(0, data.lastIndex)
             val raw = (data[sourceIndex] * config.sensitivity).coerceIn(0f, 1f)
-            val height = (0.025f + raw * 0.88f).coerceIn(0.025f, 0.92f)
-            val x0 = -1f + i * slot + gap * 0.5f
+            val height = ((0.025f + raw * 0.88f) * config.barHeight).coerceIn(0.025f, 1.5f)
+            val x0 = -1f + i * slot + horizontalInset
             val x1 = min(1f, x0 + barWidth)
             val y0 = -0.94f
             val y1 = y0 + height
