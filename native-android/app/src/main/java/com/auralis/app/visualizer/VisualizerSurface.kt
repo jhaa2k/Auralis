@@ -313,45 +313,79 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     else -> appendQuad(left, bottom, right, top, a, r, g, b)
                 }
             }
-            // Soft expanded underlay approximates a glow without an expensive blur pass.
-            if (config.glow > 0f) appendQuad(x0 - 0.006f, y0 - 0.008f, x1 + 0.006f, y1 + 0.008f, alpha * config.glow * 0.22f)
-            val previousTop = y0 + previousHeights[i]
-            if (config.motionBlurAmount > 0f && previousHeights[i] > 0f) {
-                val trailOffset = 0.006f + config.motionBlurAmount * 0.035f
-                appendQuad(x0 - trailOffset, y0, x1 - trailOffset, previousTop, alpha * config.motionBlurAmount * 0.32f)
+            val previousHeight = previousHeights[i]
+            val previousTop = y0 + previousHeight
+            fun blurChannel(color: Long, shift: Int) = ((color shr shift) and 0xFF).toFloat() / 255f
+            fun drawGlow() {
+                if (config.glow <= 0f) return
+                appendQuad(
+                    x0 - 0.006f, y0 - 0.008f, x1 + 0.006f, y1 + 0.008f,
+                    alpha * config.glow * 0.22f * blurChannel(config.blurColor, 24),
+                    blurChannel(config.blurColor, 16),
+                    blurChannel(config.blurColor, 8),
+                    blurChannel(config.blurColor, 0)
+                )
             }
-            previousHeights[i] = height
-            val styles = config.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
-            val standardSegmentHeight = (y1 - y0) / styles.size.coerceAtLeast(1)
-            var segmentCursor = y0
-            styles.forEachIndexed { segmentIndex, style ->
-                val segmentHeight = if (style.fixedHeight > 0f) {
-                    (style.fixedHeight * 0.25f).coerceAtMost(1.5f)
-                } else standardSegmentHeight
-                val actualHeight = (segmentHeight * style.heightMultiplier).coerceIn(0f, 1.5f)
-                val gapSize = actualHeight * segmentGap * 0.5f
-                val segmentBottom = segmentCursor + gapSize
-                val segmentTop = segmentCursor + actualHeight - gapSize
-                if (segmentTop > segmentBottom) {
-                    fun styleChannel(shift: Int): Float {
-                        val from = ((style.colorFrom shr shift) and 0xFF).toFloat()
-                        val to = ((style.colorTo shr shift) and 0xFF).toFloat()
-                        return (from + (to - from) * colorProgress) / 255f
-                    }
-                    val sr = styleChannel(16)
-                    val sg = styleChannel(8)
-                    val sb = styleChannel(0)
-                    val sa = alpha * styleChannel(24)
-                    fun drawAt(left: Float, bottom: Float, right: Float, top: Float, flip: Boolean = false) {
-                        appendShape(style.shape, left, bottom, right, top, sa, sr, sg, sb, flipVertical = flip)
-                    }
-                    drawAt(x0, segmentBottom, x1, segmentTop, style.flipOther && i % 2 == 1)
-                    if (style.mirror || config.mirror) drawAt(x0, -segmentTop, x1, -segmentBottom, style.flipOther && i % 2 == 1)
-                    if (config.mirrorX) drawAt(-x1, segmentBottom, -x0, segmentTop, style.flipOther && i % 2 == 1)
-                    if (config.mirrorX && (style.mirror || config.mirror)) drawAt(-x1, -segmentTop, -x0, -segmentBottom, style.flipOther && i % 2 == 1)
+            fun drawMotionTrail() {
+                if (config.motionBlurAmount <= 0f || previousHeight <= 0f) return
+                val sourceFactor = when (config.motionBlurSource) {
+                    "AudioVolume" -> raw.coerceIn(0f, 1f)
+                    else -> (kotlin.math.abs(height - previousHeight) / height.coerceAtLeast(0.05f)).coerceIn(0.15f, 1f)
                 }
-                segmentCursor += actualHeight
+                val trailOffset = if (config.motionBlurRelativeMotion) {
+                    0.006f + config.motionBlurAmount * 0.035f * sourceFactor
+                } else {
+                    config.motionBlurAmount * 0.035f
+                }
+                val trailTop = if (config.motionBlurRelativeMotion) previousTop else y0 + height * 0.68f
+                val motionAlpha = alpha * config.motionBlurAmount * 0.32f * sourceFactor * blurChannel(config.motionBlurColor, 24)
+                appendQuad(
+                    x0 - trailOffset, y0, x1 - trailOffset, trailTop, motionAlpha,
+                    blurChannel(config.motionBlurColor, 16),
+                    blurChannel(config.motionBlurColor, 8),
+                    blurChannel(config.motionBlurColor, 0)
+                )
             }
+            if (config.blurShowSharpUnder) drawGlow()
+            if (config.motionBlurShowSharpUnder) drawMotionTrail()
+
+            val drawSharp = config.blurShowSharp && config.motionBlurShowSharp
+            val styles = config.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
+            if (drawSharp) {
+                val standardSegmentHeight = (y1 - y0) / styles.size.coerceAtLeast(1)
+                var segmentCursor = y0
+                styles.forEach { style ->
+                    val segmentHeight = if (style.fixedHeight > 0f) {
+                        (style.fixedHeight * 0.25f).coerceAtMost(1.5f)
+                    } else standardSegmentHeight
+                    val actualHeight = (segmentHeight * style.heightMultiplier).coerceIn(0f, 1.5f)
+                    val gapSize = actualHeight * segmentGap * 0.5f
+                    val segmentBottom = segmentCursor + gapSize
+                    val segmentTop = segmentCursor + actualHeight - gapSize
+                    if (segmentTop > segmentBottom) {
+                        fun styleChannel(shift: Int): Float {
+                            val from = ((style.colorFrom shr shift) and 0xFF).toFloat()
+                            val to = ((style.colorTo shr shift) and 0xFF).toFloat()
+                            return (from + (to - from) * colorProgress) / 255f
+                        }
+                        val sr = styleChannel(16)
+                        val sg = styleChannel(8)
+                        val sb = styleChannel(0)
+                        val sa = alpha * styleChannel(24)
+                        fun drawAt(left: Float, bottom: Float, right: Float, top: Float, flip: Boolean = false) {
+                            appendShape(style.shape, left, bottom, right, top, sa, sr, sg, sb, flipVertical = flip)
+                        }
+                        drawAt(x0, segmentBottom, x1, segmentTop, style.flipOther && i % 2 == 1)
+                        if (style.mirror || config.mirror) drawAt(x0, -segmentTop, x1, -segmentBottom, style.flipOther && i % 2 == 1)
+                        if (config.mirrorX) drawAt(-x1, segmentBottom, -x0, segmentTop, style.flipOther && i % 2 == 1)
+                        if (config.mirrorX && (style.mirror || config.mirror)) drawAt(-x1, -segmentTop, -x0, -segmentBottom, style.flipOther && i % 2 == 1)
+                    }
+                    segmentCursor += actualHeight
+                }
+            }
+            if (!config.blurShowSharpUnder) drawGlow()
+            if (!config.motionBlurShowSharpUnder) drawMotionTrail()
+            previousHeights[i] = height
         }
         val buffer = vertexBuffer ?: return
         buffer.clear()
