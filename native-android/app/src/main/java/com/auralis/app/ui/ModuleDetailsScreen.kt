@@ -243,7 +243,7 @@ internal fun ModuleDetailsScreen(
                                                             ) {}
                                                         }
                                                     }
-                                                    Text("HEX OUTPUT: \$value",color=StudioMuted,fontSize=8.sp)
+                                                    Text("HEX OUTPUT: $value",color=StudioMuted,fontSize=8.sp)
                                                 }
                                             }
                                         }
