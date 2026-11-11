@@ -68,6 +68,52 @@ object ModuleCatalog {
         "imageIndex", "sourceCompositionIndex", "audioProviderIndex" -> 0f to 999f
         else -> 0f to 1f
     }
+    private fun defaultFor(key: String, kind: SettingKind, min: Float, max: Float, options: List<String>): String =
+        when (key) {
+            "visible", "keepAspect", "metadataVariables", "uniformScale", "clearCanvas" -> "true"
+            "positionX", "positionY", "alignmentX", "alignmentY", "pivotX", "pivotY" -> "0.5"
+            "scaleX", "scaleY", "particleScale", "opacity", "opacityStrength", "alpha", "contrast", "saturation", "lineHeight" -> "1"
+            "rotation", "splitAmount", "brightness", "colorBlendOffset", "gravityX", "gravityY" -> "0"
+            "barCount" -> "64"
+            "barWidth" -> "0.72"
+            "barSpacing" -> "0.18"
+            "heightScale", "maxHeightScale", "segment1HeightMultiplier", "segment2HeightMultiplier", "segment3HeightMultiplier" -> "1"
+            "minHeightScale", "segment1FixedHeight", "segment2FixedHeight", "segment3FixedHeight" -> "0"
+            "softness" -> "0.35"
+            "countLimit" -> "120"
+            "speed", "volume", "preamp", "animationSpeed", "typewriterSpeed" -> "1"
+            "speedRandom", "sideSineMag", "sideSineMagRandom", "trailLength", "fadeInSize" -> "0"
+            "startSize" -> "3"
+            "endSize" -> "4"
+            "endSizeRandom" -> "10"
+            "amountX", "amountY" -> "0.8"
+            "lifetime" -> "8"
+            "sideSineFreq" -> "5"
+            "sideSineFreqRandom" -> "0"
+            "fadeInOut" -> "0.1"
+            "vectorAngle" -> "270"
+            "vectorAngleZ" -> "0"
+            "sizeAspectRatio" -> "1"
+            "fontSize" -> "30"
+            "fontWeight" -> "400"
+            "letterSpacing", "shadowX", "shadowY", "outlineWidth" -> "0"
+            "shadowBlur" -> "0"
+            "blurRadius" -> "2"
+            "blurMultiplier" -> "4.1"
+            "blurAmount" -> "0.2"
+            "lowerHz" -> "20"
+            "higherHz" -> "18000"
+            "bpmSync" -> "120"
+            "audioOffset", "beatOffset" -> "0"
+            else -> when (kind) {
+                SettingKind.CHECKBOX -> "false"
+                SettingKind.COLOR -> "#FFFFFFFF"
+                SettingKind.DROPDOWN -> options.firstOrNull().orEmpty()
+                SettingKind.SLIDER, SettingKind.NUMBER -> min.toString()
+                else -> ""
+            }
+        }
+
     private fun s(
         key: String,
         label: String,
@@ -76,7 +122,10 @@ object ModuleCatalog {
         max: Float = defaultRange(key).second,
         options: List<String> = emptyList(),
         default: String = ""
-    ) = SettingSpec(key, label, kind, options, min, max, default)
+    ): SettingSpec {
+        val resolvedDefault = default.ifBlank { defaultFor(key, kind, min, max, options) }
+        return SettingSpec(key, label, kind, options, min, max, resolvedDefault)
+    }
     private fun general() = SettingGroup("General", listOf(
         s("tag","Tag",SettingKind.TEXT), s("visible","Visible",SettingKind.CHECKBOX,default="true"),
         s("blendMode","Blend Mode",SettingKind.DROPDOWN,options=blendModes,default="Alpha"),
