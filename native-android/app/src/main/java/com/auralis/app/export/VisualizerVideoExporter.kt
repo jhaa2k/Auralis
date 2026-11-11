@@ -172,7 +172,7 @@ object VisualizerVideoExporter {
 
     private class GlSurface(input:android.view.Surface,w:Int,h:Int) {
         val display=EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);private val context:android.opengl.EGLContext;val surface:android.opengl.EGLSurface
-        private val program:Int;private val p:Int;private val col:Int;private val buf:FloatBuffer
+        private val program:Int;private val p:Int;private val col:Int;private var buf:FloatBuffer
         init {
             val v=IntArray(2);check(EGL14.eglInitialize(display,v,0,v,1))
             val attrs=intArrayOf(EGL14.EGL_RED_SIZE,8,EGL14.EGL_GREEN_SIZE,8,EGL14.EGL_BLUE_SIZE,8,EGL14.EGL_ALPHA_SIZE,8,EGL14.EGL_RENDERABLE_TYPE,EGL14.EGL_OPENGL_ES2_BIT,0x3142,1,EGL14.EGL_NONE)
@@ -183,12 +183,20 @@ object VisualizerVideoExporter {
             val vs="attribute vec2 p;attribute vec4 c;varying vec4 v;void main(){gl_Position=vec4(p,0.,1.);v=c;}"
             val fs="precision mediump float;varying vec4 v;void main(){gl_FragColor=v;}"
             program=link(shader(GLES20.GL_VERTEX_SHADER,vs),shader(GLES20.GL_FRAGMENT_SHADER,fs));p=GLES20.glGetAttribLocation(program,"p");col=GLES20.glGetAttribLocation(program,"c")
-            buf=ByteBuffer.allocateDirect((128*32*36*16 + 400*36*16)*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+            buf=ByteBuffer.allocateDirect(64*36*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             GLES20.glViewport(0,0,w,h);GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
         fun draw(bands: FloatArray, layers: List<VisualizerSettings>) {
+            val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(8)
+            val requiredFloats = configs.sumOf { layer ->
+                val bars = if (layer.barsEnabled) layer.barCount.coerceIn(16,128) * (layer.segmentCount.coerceIn(1,32) * 4 + 2) * 36 else 0
+                val particles = if (layer.particlesEnabled) layer.particleCount.coerceIn(0,400) * 36 else 0
+                bars + particles
+            }.coerceAtLeast(36)
+            if (buf.capacity() < requiredFloats) {
+                buf = ByteBuffer.allocateDirect(requiredFloats * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+            }
             buf.clear()
-            val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
             val background = configs.firstOrNull()?.backgroundColor ?: 0xFF101116L
             GLES20.glClearColor(((background shr 16) and 255).toFloat()/255f, ((background shr 8) and 255).toFloat()/255f, (background and 255).toFloat()/255f, ((background shr 24) and 255).toFloat()/255f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
