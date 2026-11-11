@@ -239,7 +239,7 @@ object VisualizerVideoExporter {
             fun polygon(
                 left: Float, bottom: Float, right: Float, top: Float, sides: Int,
                 red: Float, green: Float, blue: Float, alpha: Float,
-                config: VisualizerSettings, star: Boolean = false, rotationOffset: Float = 0f
+                config: VisualizerSettings, star: Boolean = false, rotationOffset: Float = 0f, flipVertical: Boolean = false
             ) {
                 val cx = (left + right) * .5f; val cy = (bottom + top) * .5f
                 val rx = (right - left) * .5f; val ry = (top - bottom) * .5f
@@ -247,7 +247,7 @@ object VisualizerVideoExporter {
                 for (index in 0 until sides) {
                     val a = -PI/2.0 + index * PI * 2.0 / sides
                     val radius = if (star && index % 2 == 1) .42f else 1f
-                    points.add(Pair(cx + cos(a).toFloat()*rx*radius, cy + sin(a).toFloat()*ry*radius))
+                    points.add(Pair(cx + cos(a).toFloat()*rx*radius, cy + (if (flipVertical) -1f else 1f)*sin(a).toFloat()*ry*radius))
                 }
                 points.indices.forEach { index ->
                     val p0 = points[index]; val p1 = points[(index+1)%points.size]
@@ -257,15 +257,15 @@ object VisualizerVideoExporter {
             fun shape(
                 name: String, left: Float, bottom: Float, right: Float, top: Float,
                 red: Float, green: Float, blue: Float, alpha: Float,
-                config: VisualizerSettings, rotationOffset: Float = 0f
+                config: VisualizerSettings, rotationOffset: Float = 0f, flipVertical: Boolean = false
             ) {
                 when (name) {
                     "None" -> Unit
                     "Line", "HorizontalLine" -> quad(left,(bottom+top)*.5f-.0035f,right,(bottom+top)*.5f+.0035f,red,green,blue,alpha,config,rotationOffset)
                     "VerticalLine" -> quad((left+right)*.5f-.0035f,bottom,(left+right)*.5f+.0035f,top,red,green,blue,alpha,config,rotationOffset)
-                    "Circle", "Oval" -> polygon(left,bottom,right,top,20,red,green,blue,alpha,config,rotationOffset=rotationOffset)
+                    "Circle", "Oval" -> polygon(left,bottom,right,top,20,red,green,blue,alpha,config,rotationOffset=rotationOffset,flipVertical=flipVertical)
                     "Triangle" -> polygon(left,bottom,right,top,3,red,green,blue,alpha,config,rotationOffset=rotationOffset)
-                    "Star", "Heart" -> polygon(left,bottom,right,top,10,red,green,blue,alpha,config,star=true,rotationOffset=rotationOffset)
+                    "Star", "Heart" -> polygon(left,bottom,right,top,10,red,green,blue,alpha,config,star=true,rotationOffset=rotationOffset,flipVertical=flipVertical)
                     "Pentagon" -> polygon(left,bottom,right,top,5,red,green,blue,alpha,config,rotationOffset=rotationOffset)
                     "Hexagon", "SidedPolygon" -> polygon(left,bottom,right,top,6,red,green,blue,alpha,config,rotationOffset=rotationOffset)
                     "Square" -> {
@@ -283,6 +283,7 @@ object VisualizerVideoExporter {
                     val styles = config.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
                     for (i in 0 until count) {
                         val progress = i.toFloat()/(count-1).coerceAtLeast(1)
+                        val colorProgress = (progress + config.colorBlendOffset).let { it - floor(it) }
                         val index = ((if(config.flipInput) 1f-progress else progress)*(bands.size-1)).toInt().coerceIn(0,bands.lastIndex)
                         val height = (config.barMinHeight + bands[index]*config.sensitivity*config.barHeight*.88f).coerceIn(.005f,1.5f)
                         val left=-1f+i*slot+(slot-width)*.5f; val right=left+width; val base=-.94f
@@ -301,11 +302,11 @@ object VisualizerVideoExporter {
                                 val alpha=config.opacity*segmentChannel(24)
                                 if (config.glow > 0f) quad(left-.008f,bottom-.008f,right+.008f,top+.008f,sr,sg,sb,alpha*config.glow*.2f,config)
                                 if (config.motionBlurAmount > 0f) quad(left-.006f,bottom,right-.006f,top,sr,sg,sb,alpha*config.motionBlurAmount*.28f,config)
-                                val flip = if (style.flipOther && i%2==1) 180f else 0f
-                                shape(style.shape,left,bottom,right,top,sr,sg,sb,alpha,config,flip)
-                                if (style.mirror || config.mirror) shape(style.shape,left,-top,right,-bottom,sr,sg,sb,alpha,config,flip)
-                                if (config.mirrorX) shape(style.shape,-right,bottom,-left,top,sr,sg,sb,alpha,config,flip)
-                                if (config.mirrorX && (style.mirror || config.mirror)) shape(style.shape,-right,-top,-left,-bottom,sr,sg,sb,alpha,config,flip)
+                                val flip = style.flipOther && i%2==1
+                                shape(style.shape,left,bottom,right,top,sr,sg,sb,alpha,config,flipVertical=flip)
+                                if (style.mirror || config.mirror) shape(style.shape,left,-top,right,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
+                                if (config.mirrorX) shape(style.shape,-right,bottom,-left,top,sr,sg,sb,alpha,config,flipVertical=flip)
+                                if (config.mirrorX && (style.mirror || config.mirror)) shape(style.shape,-right,-top,-left,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
                             }
                             cursor += segmentHeight
                         }
