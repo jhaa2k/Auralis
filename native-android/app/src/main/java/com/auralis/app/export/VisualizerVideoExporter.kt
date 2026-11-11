@@ -332,10 +332,26 @@ object VisualizerVideoExporter {
                                     val sr=segmentChannel(16); val sg=segmentChannel(8); val sb=segmentChannel(0)
                                     val alpha=config.opacity*config.compositionAlpha*segmentChannel(24)
                                     val flip = style.flipOther && i%2==1
-                                    shape(style.shape,left,bottom,right,top,sr,sg,sb,alpha,config,flipVertical=flip)
-                                    if (style.mirror || config.mirror) shape(style.shape,left,-top,right,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
-                                    if (config.mirrorX) shape(style.shape,-right,bottom,-left,top,sr,sg,sb,alpha,config,flipVertical=flip)
-                                    if (config.mirrorX && (style.mirror || config.mirror)) shape(style.shape,-right,-top,-left,-bottom,sr,sg,sb,alpha,config,flipVertical=flip)
+                                    fun mirrorChannel(shift:Int) = ((config.mirrorColor shr shift) and 255).toFloat()/255f
+                                    fun drawSegment(
+                                        l:Float,b:Float,r:Float,t:Float,mirrorCopy:Boolean=false,offsetX:Float=0f,offsetY:Float=0f
+                                    ) {
+                                        val tintR=if(mirrorCopy) mirrorChannel(16) else 1f
+                                        val tintG=if(mirrorCopy) mirrorChannel(8) else 1f
+                                        val tintB=if(mirrorCopy) mirrorChannel(0) else 1f
+                                        val tintA=if(mirrorCopy) mirrorChannel(24) else 1f
+                                        shape(
+                                            style.shape,l+offsetX,b+offsetY,r+offsetX,t+offsetY,
+                                            sr*tintR,sg*tintG,sb*tintB,alpha*tintA,config,
+                                            flipVertical=flip || (mirrorCopy && config.mirrorFlip)
+                                        )
+                                    }
+                                    drawSegment(left,bottom,right,top)
+                                    if (style.mirror || config.mirror) drawSegment(left,-top,right,-bottom,true,offsetY=config.mirrorOffset)
+                                    if (config.mirrorX) drawSegment(-right,bottom,-left,top,true,offsetX=config.mirrorOffset)
+                                    if (config.mirrorX && (style.mirror || config.mirror)) {
+                                        drawSegment(-right,-top,-left,-bottom,true,config.mirrorOffset,config.mirrorOffset)
+                                    }
                                 }
                                 cursor += segmentHeight
                             }
@@ -410,9 +426,20 @@ object VisualizerVideoExporter {
                         val halfX = size * config.particleSizeAspectRatio
                         val halfY = size
                         val drawAngle = if (config.particleVelocityAngle) Math.toDegrees(direction).toFloat() else config.particleRotation
-                        fun drawParticle(px: Float, py: Float, alphaMul: Float = 1f, sizeMul: Float = 1f) {
+                        fun drawParticle(
+                            px: Float, py: Float, alphaMul: Float = 1f, sizeMul: Float = 1f,
+                            mirrorCopy: Boolean = false, offsetX: Float = 0f, offsetY: Float = 0f
+                        ) {
                             val hx = halfX * sizeMul; val hy = halfY * sizeMul
-                            quad(px-hx,py-hy,px+hx,py+hy,red,green,blue,alpha*alphaMul,config,drawAngle)
+                            val tintR = if (mirrorCopy) channel(config.mirrorColor, 16) else 1f
+                            val tintG = if (mirrorCopy) channel(config.mirrorColor, 8) else 1f
+                            val tintB = if (mirrorCopy) channel(config.mirrorColor, 0) else 1f
+                            val tintA = if (mirrorCopy) channel(config.mirrorColor, 24) else 1f
+                            val angle = drawAngle + if (mirrorCopy && config.mirrorFlip) 180f else 0f
+                            quad(
+                                px+offsetX-hx,py+offsetY-hy,px+offsetX+hx,py+offsetY+hy,
+                                red*tintR,green*tintG,blue*tintB,alpha*alphaMul*tintA,config,angle
+                            )
                         }
                         drawParticle(x, y)
                         if (config.particleTrailLength > 0f) {
@@ -421,27 +448,27 @@ object VisualizerVideoExporter {
                             drawParticle(x-directionX*tail*2f,y-directionY*tail*2f,.18f,.58f)
                         }
                         if (config.particleMirrorX) {
-                            drawParticle(-x, y)
+                            drawParticle(-x, y, mirrorCopy = true, offsetX = config.mirrorOffset)
                             if (config.particleTrailLength > 0f) {
                                 val tail = config.particleTrailLength * .003f
-                                drawParticle(-x+directionX*tail,y-directionY*tail,.42f,.78f)
-                                drawParticle(-x+directionX*tail*2f,y-directionY*tail*2f,.18f,.58f)
+                                drawParticle(-x+directionX*tail,y-directionY*tail,.42f,.78f,true,config.mirrorOffset)
+                                drawParticle(-x+directionX*tail*2f,y-directionY*tail*2f,.18f,.58f,true,config.mirrorOffset)
                             }
                         }
                         if (config.particleMirrorY) {
-                            drawParticle(x, -y)
+                            drawParticle(x, -y, mirrorCopy = true, offsetY = config.mirrorOffset)
                             if (config.particleTrailLength > 0f) {
                                 val tail = config.particleTrailLength * .003f
-                                drawParticle(x-directionX*tail,-y+directionY*tail,.42f,.78f)
-                                drawParticle(x-directionX*tail*2f,-y+directionY*tail*2f,.18f,.58f)
+                                drawParticle(x-directionX*tail,-y+directionY*tail,.42f,.78f,true,0f,config.mirrorOffset)
+                                drawParticle(x-directionX*tail*2f,-y+directionY*tail*2f,.18f,.58f,true,0f,config.mirrorOffset)
                             }
                         }
                         if (config.particleMirrorX && config.particleMirrorY) {
-                            drawParticle(-x, -y)
+                            drawParticle(-x, -y, mirrorCopy = true, offsetX = config.mirrorOffset, offsetY = config.mirrorOffset)
                             if (config.particleTrailLength > 0f) {
                                 val tail = config.particleTrailLength * .003f
-                                drawParticle(-x+directionX*tail,-y+directionY*tail,.42f,.78f)
-                                drawParticle(-x+directionX*tail*2f,-y+directionY*tail*2f,.18f,.58f)
+                                drawParticle(-x+directionX*tail,-y+directionY*tail,.42f,.78f,true,config.mirrorOffset,config.mirrorOffset)
+                                drawParticle(-x+directionX*tail*2f,-y+directionY*tail*2f,.18f,.58f,true,config.mirrorOffset,config.mirrorOffset)
                             }
                         }
                     }
