@@ -220,7 +220,14 @@ object VisualizerVideoExporter {
                         for (segment in 0 until segments) {
                             val bottom=base+segment*segH+segH*gap*.5f
                             val top=base+(segment+1)*segH-segH*gap*.5f
-                            if(top>bottom) { quad(left,bottom,right,top,r,g,bl,alpha,config); if(config.mirror) quad(left,-top,right,-bottom,r,g,bl,alpha,config) }
+                            if(top>bottom) {
+                                if (config.glow > 0f) quad(left-.008f,bottom-.008f,right+.008f,top+.008f,r,g,bl,alpha*config.glow*.2f,config)
+                                if (config.motionBlurAmount > 0f) quad(left-.006f,bottom,right-.006f,top,r,g,bl,alpha*config.motionBlurAmount*.28f,config)
+                                quad(left,bottom,right,top,r,g,bl,alpha,config)
+                                if(config.mirror) quad(left,-top,right,-bottom,r,g,bl,alpha,config)
+                                if(config.mirrorX) quad(-right,bottom,-left,top,r,g,bl,alpha,config)
+                                if(config.mirror && config.mirrorX) quad(-right,-top,-left,-bottom,r,g,bl,alpha,config)
+                            }
                         }
                     }
                 }
