@@ -187,7 +187,7 @@ object VisualizerVideoExporter {
             GLES20.glViewport(0,0,w,h);GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
         fun draw(bands: FloatArray, layers: List<VisualizerSettings>) {
-            val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(8)
+            val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
             val requiredFloats = configs.sumOf { layer ->
                 val bars = if (layer.barsEnabled) layer.barCount.coerceIn(16,128) * (layer.segmentCount.coerceIn(1,32) * 4 + 2) * 36 else 0
                 val particles = if (layer.particlesEnabled) layer.particleCount.coerceIn(0,400) * 36 else 0
