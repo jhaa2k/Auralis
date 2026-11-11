@@ -46,6 +46,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var roundPointHandle = 0
     private var offsetHandle = 0
     private var tintHandle = 0
+    private var particleSizeHandle = -1
+    private var useParticleSizeHandle = -1
+    private var pointAspectHandle = -1
     private var vertexBuffer: FloatBuffer? = null
     private var particleBuffer: FloatBuffer? = null
     private val vertexCapacity = 128 * (32 * 4 + 2) * 36
@@ -76,6 +79,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val nextProgram = linkProgram(vertex, fragment)
         val nextPosition = GLES20.glGetAttribLocation(nextProgram, "aPosition")
         val nextColor = GLES20.glGetAttribLocation(nextProgram, "aColor")
+        val nextParticleSize = GLES20.glGetAttribLocation(nextProgram, "aParticleSize")
+        val nextUseParticleSize = GLES20.glGetUniformLocation(nextProgram, "uUseParticleSize")
+        val nextPointAspect = GLES20.glGetUniformLocation(nextProgram, "uPointAspect")
         require(nextPosition >= 0 && nextColor >= 0) { "Shader must expose aPosition and aColor attributes." }
         val oldProgram = program
         program = nextProgram
@@ -85,6 +91,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         roundPointHandle = GLES20.glGetUniformLocation(nextProgram, "uRoundPoint")
         offsetHandle = GLES20.glGetUniformLocation(nextProgram, "uOffset")
         tintHandle = GLES20.glGetUniformLocation(nextProgram, "uTint")
+        particleSizeHandle = nextParticleSize
+        useParticleSizeHandle = nextUseParticleSize
+        pointAspectHandle = nextPointAspect
         if (oldProgram != 0) GLES20.glDeleteProgram(oldProgram)
         GLES20.glDeleteShader(vertex)
         GLES20.glDeleteShader(fragment)
@@ -97,9 +106,11 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             varying vec4 vColor;
             uniform float uPointSize;
             uniform vec2 uOffset;
+            uniform float uUseParticleSize;
+            attribute float aParticleSize;
             void main() {
                 gl_Position = vec4(aPosition + uOffset, 0.0, 1.0);
-                gl_PointSize = uPointSize;
+                gl_PointSize = uUseParticleSize > 0.5 ? aParticleSize : uPointSize;
                 vColor = aColor;
             }
         """.trimIndent()
@@ -108,8 +119,12 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             varying vec4 vColor;
             uniform float uRoundPoint;
             uniform vec4 uTint;
+            uniform float uPointAspect;
             void main() {
-                if (uRoundPoint > 0.5 && distance(gl_PointCoord, vec2(0.5, 0.5)) > 0.5) discard;
+                vec2 pointCoord = gl_PointCoord - vec2(0.5);
+                if (uPointAspect > 1.0) pointCoord.y *= uPointAspect;
+                else pointCoord.x /= max(uPointAspect, 0.01);
+                if (uRoundPoint > 0.5 && dot(pointCoord, pointCoord) > 0.25) discard;
                 gl_FragColor = vec4(vColor.rgb * uTint.rgb, vColor.a * uTint.a);
             }
         """.trimIndent()
@@ -120,6 +135,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         roundPointHandle = GLES20.glGetUniformLocation(program, "uRoundPoint")
         offsetHandle = GLES20.glGetUniformLocation(program, "uOffset")
         tintHandle = GLES20.glGetUniformLocation(program, "uTint")
+        particleSizeHandle = GLES20.glGetAttribLocation(program, "aParticleSize")
+        useParticleSizeHandle = GLES20.glGetUniformLocation(program, "uUseParticleSize")
+        pointAspectHandle = GLES20.glGetUniformLocation(program, "uPointAspect")
         vertexBuffer = ByteBuffer.allocateDirect(vertexCapacity * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         particleBuffer = ByteBuffer.allocateDirect(5000 * 4 * 6 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
@@ -286,7 +304,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 (if (config.particleMirrorY) 1 else 0) +
                 (if (config.particleMirrorX && config.particleMirrorY) 1 else 0)
             val tailCopies = if (config.particleTrailLength > 0f) 3 else 1
-            val requiredFloats = config.particleCount * mirrorCopies * tailCopies * 6
+            val requiredFloats = config.particleCount * mirrorCopies * tailCopies * 7
             val points = particleBuffer?.takeIf { it.capacity() >= requiredFloats }
                 ?: ByteBuffer.allocateDirect(requiredFloats.coerceAtLeast(6) * 4)
                     .order(ByteOrder.nativeOrder()).asFloatBuffer().also { particleBuffer = it }
@@ -306,12 +324,13 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val particleSin = sin(particleRotation).toFloat()
 
             fun colorChannel(color: Long, shift: Int) = ((color shr shift) and 0xFF).toFloat() / 255f
-            fun appendParticle(px: Float, py: Float, color: Long, alphaMultiplier: Float) {
+            fun appendParticle(px: Float, py: Float, color: Long, alphaMultiplier: Float, particlePointSize: Float) {
                 points.put(px); points.put(py)
                 points.put(colorChannel(color, 16))
                 points.put(colorChannel(color, 8))
                 points.put(colorChannel(color, 0))
                 points.put(colorChannel(color, 24) * alphaMultiplier)
+                points.put(particlePointSize)
                 renderedParticleCount++
             }
 
@@ -384,47 +403,60 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     ((lerpChannel(16) * 255f).toLong() shl 16) or
                     ((lerpChannel(8) * 255f).toLong() shl 8) or
                     (lerpChannel(0) * 255f).toLong()
+                val startSize = if (config.particleFadeInSize > 0f) config.particleFadeInSize else config.particleSize
+                val randomEndSize = (config.particleEndSize +
+                    (randomB * 2f - 1f) * config.particleEndSizeRandom).coerceIn(0f, 64f)
+                val particlePointSize = (startSize + (randomEndSize - startSize) * phase) *
+                    particleScale * (0.75f + fadeIn * 0.25f)
 
-                appendParticle(x, y, color, alpha)
+                appendParticle(x, y, color, alpha, particlePointSize)
                 if (config.particleTrailLength > 0f) {
                     val tailDistance = config.particleTrailLength * 0.003f
-                    appendParticle(x - directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f)
-                    appendParticle(x - directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f)
+                    appendParticle(x - directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f)
+                    appendParticle(x - directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f)
                 }
                 if (config.particleMirrorX) {
-                    appendParticle(-x, y, color, alpha)
+                    appendParticle(-x, y, color, alpha, particlePointSize)
                     if (config.particleTrailLength > 0f) {
                         val tailDistance = config.particleTrailLength * 0.003f
-                        appendParticle(-x + directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f)
-                        appendParticle(-x + directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f)
+                        appendParticle(-x + directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f)
+                        appendParticle(-x + directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f)
                     }
                 }
                 if (config.particleMirrorY) {
-                    appendParticle(x, -y, color, alpha)
+                    appendParticle(x, -y, color, alpha, particlePointSize)
                     if (config.particleTrailLength > 0f) {
                         val tailDistance = config.particleTrailLength * 0.003f
-                        appendParticle(x - directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f)
-                        appendParticle(x - directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f)
+                        appendParticle(x - directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f)
+                        appendParticle(x - directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f)
                     }
                 }
                 if (config.particleMirrorX && config.particleMirrorY) {
-                    appendParticle(-x, -y, color, alpha)
+                    appendParticle(-x, -y, color, alpha, particlePointSize)
                     if (config.particleTrailLength > 0f) {
                         val tailDistance = config.particleTrailLength * 0.003f
-                        appendParticle(-x + directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f)
-                        appendParticle(-x + directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f)
+                        appendParticle(-x + directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f)
+                        appendParticle(-x + directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f)
                     }
                 }
             }
             points.position(0)
             GLES20.glUniform1f(roundPointHandle, 1f)
             GLES20.glUniform1f(pointSizeHandle, config.particleSize * particleScale)
+            GLES20.glUniform1f(useParticleSizeHandle, if (particleSizeHandle >= 0) 1f else 0f)
+            GLES20.glUniform1f(pointAspectHandle, config.particleSizeAspectRatio)
             GLES20.glUniform2f(offsetHandle, 0f, 0f)
             GLES20.glUniform4f(tintHandle, 1f, 1f, 1f, 1f)
-            GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 24, points)
+            GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 28, points)
             points.position(2)
-            GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, points)
+            GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 28, points)
+            if (particleSizeHandle >= 0) {
+                points.position(6)
+                GLES20.glEnableVertexAttribArray(particleSizeHandle)
+                GLES20.glVertexAttribPointer(particleSizeHandle, 1, GLES20.GL_FLOAT, false, 28, points)
+            }
             GLES20.glDrawArrays(GLES20.GL_POINTS, 0, renderedParticleCount)
+            if (particleSizeHandle >= 0) GLES20.glDisableVertexAttribArray(particleSizeHandle)
         }
         }
         GLES20.glDisableVertexAttribArray(positionHandle)
