@@ -1002,7 +1002,20 @@ private data class EditorLayer(
     val scaleMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val rotationMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val measureAmount: Float = 0.5f,
-    val rgbSplitAmount: Float = 0f
+    val rgbSplitAmount: Float = 0f,
+    val imageFitMode: String = "KEEP_ASPECT_RATIO",
+    val imageSourceMode: String = "GENERATED_ALBUM_ART",
+    val blurIntensity: Float = 0.15f,
+    val particleTransparency: Float = 1f,
+    val particleVectorAngle: Float = 0f,
+    val barsSpeed: Float = 1f,
+    val beatAmount: Float = 0.5f,
+    val rgbBeatTrigger: Boolean = true,
+    val motionBlurTrailing: Float = 0.2f,
+    val compositionBlendMode: String = "NORMAL",
+    val shaderSource: String = "// GLSL ES 2.0 fragment shader\nvoid main() { gl_FragColor = vec4(1.0); }",
+    val songTitle: String = "%title%",
+    val artistName: String = "%artist%"
 )
 
 private fun queryDisplayName(context: android.content.Context, uri: Uri): String {
