@@ -2,6 +2,7 @@ package com.auralis.app.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -166,8 +167,7 @@ internal fun ModuleDetailsScreen(
     fun write(field: SettingSpec, value: String) { values[prefix + field.name] = value }
     Column(Modifier.fillMaxSize().background(StudioBlack).padding(14.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("‹", color = StudioWhite, fontSize = 28.sp, modifier = Modifier.padding(end=16.dp))
-            androidx.compose.foundation.clickableNoRipple(onBack) { Text("‹", color=StudioWhite,fontSize=28.sp) }
+            Text("‹", color = StudioWhite, fontSize = 28.sp, modifier = Modifier.clickable { onBack() }.padding(end=16.dp))
             Column(Modifier.weight(1f)) {
                 Text(spec.title, color=StudioWhite,fontSize=14.sp,fontWeight=FontWeight.Black,letterSpacing=1.sp)
                 Text("LAYER $layerId  /  PROPERTIES",color=StudioMuted,fontSize=8.sp)
@@ -180,7 +180,7 @@ internal fun ModuleDetailsScreen(
             spec.groups.forEach { group ->
                 Surface(color=StudioPanel, border=BorderStroke(1.dp,StudioLine), shape=RoundedCornerShape(2.dp), modifier=Modifier.fillMaxWidth()) {
                     Column {
-                        Row(Modifier.fillMaxWidth().height(44.dp).clickableNoRipple { expanded=if(expanded==group.title) "" else group.title }.padding(horizontal=12.dp), verticalAlignment=Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().height(44.dp).clickable { expanded=if(expanded==group.title) "" else group.title }.padding(horizontal=12.dp), verticalAlignment=Alignment.CenterVertically) {
                             Text(group.title.uppercase(Locale.US),color=StudioWhite,fontSize=10.sp,fontWeight=FontWeight.Bold,letterSpacing=0.8.sp)
                             Spacer(Modifier.weight(1f))
                             Text(if(expanded==group.title) "−" else "+",color=StudioAccent,fontSize=18.sp)
@@ -212,7 +212,7 @@ internal fun ModuleDetailsScreen(
                                             SettingKind.SLIDER -> {
                                                 val numeric=value.toFloatOrNull() ?: 0f
                                                 Row(verticalAlignment=Alignment.CenterVertically) {
-                                                    Slider(value=numeric.coerceIn(0f,1f),onValueChange={write(field,String.format(Locale.US,"%.3f",it))},modifier=Modifier.weight(1f),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
+                                                    Slider(value=numeric.coerceIn(0f,1000f),onValueChange={write(field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..1000f,modifier=Modifier.weight(1f),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
                                                     Text(value,color=StudioWhite,fontSize=8.sp,modifier=Modifier.width(54.dp))
                                                 }
                                             }
@@ -236,8 +236,3 @@ internal fun ModuleDetailsScreen(
     if(info) AlertDialog(onDismissRequest={info=false},confirmButton={TextButton(onClick={info=false}){Text("OK")}},title={Text(spec.title)},text={Text("Settings are stored per layer. A property affects the live preview only when the corresponding renderer consumes it; unconnected values remain editable and saved in this in-memory editor model.")})
 }
 
-/** Tiny click modifier wrapper to keep the details screen's header/accordion surfaces sharp. */
-@Composable
-private fun androidx.compose.foundation.layout.BoxScope.clickableNoRipple(onClick: () -> Unit, content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment=Alignment.Center) { content() }
-}
