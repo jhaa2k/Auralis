@@ -1,6 +1,7 @@
 package com.auralis.app.visualizer
 
 data class VisualizerSettings(
+    val backgroundColor: Long = 0xFF101116,
     val barCount: Int = 64,
     val sensitivity: Float = 1f,
     val smoothing: Float = 0.35f,
