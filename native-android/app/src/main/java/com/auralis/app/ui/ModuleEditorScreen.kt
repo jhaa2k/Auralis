@@ -7,6 +7,11 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
@@ -917,6 +922,31 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         val color = runCatching { Color(android.graphics.Color.parseColor(value("textColor", "#FFFFFFFF"))) }.getOrDefault(Color.White)
         val opacity = (value("opacityStrength", "1").toFloatOrNull() ?: 1f).coerceIn(0f, 1f)
         val text = value("textInput", "{ArtistOrTitle}").replace("{ArtistOrTitle}", trackName.substringBeforeLast('.', trackName)).replace("%title%", trackName)
+        val animationType = value("animationType", "None")
+        val animationSpeed = (value("animationSpeed", "1").toFloatOrNull() ?: 1f).coerceIn(0.1f, 5f)
+        val transition = rememberInfiniteTransition(label = "text-layer-animation")
+        val animationProgress by transition.animateFloat(
+            initialValue = 0f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween((1200f / animationSpeed).toInt().coerceAtLeast(100)), repeatMode = RepeatMode.Reverse),
+            label = "text-layer-progress"
+        )
+        var animatedText by remember(text) { mutableStateOf(text) }
+        LaunchedEffect(text, animationType, animationSpeed) {
+            if (animationType == "Typewriter") {
+                animatedText = ""
+                text.indices.forEach { index ->
+                    animatedText = text.take(index + 1)
+                    delay((75f / animationSpeed).toLong().coerceAtLeast(10L))
+                }
+            } else animatedText = text
+        }
+        val animationAlpha = if (animationType == "Fade") 0.25f + animationProgress * 0.75f else 1f
+        val animationScale = if (animationType == "Zoom") 0.82f + animationProgress * 0.18f else 1f
+        val animationOffset = when (animationType) {
+            "Slide Up" -> (1f - animationProgress) * 22f
+            "Slide Down" -> (animationProgress - 1f) * 22f
+            else -> 0f
+        }
         val alignment = when (value("alignment", "Center")) {
             "Left" -> TextAlign.Start
             "Right" -> TextAlign.End
@@ -925,12 +955,12 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         }
         Box(
             modifier = Modifier.align(Alignment.Center).offset {
-                IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight).toInt())
-            }.graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f), scaleY = sy.coerceIn(0.05f, 8f), rotationZ = rotation, alpha = opacity),
+                IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight + animationOffset).toInt())
+            }.graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f) * animationScale, scaleY = sy.coerceIn(0.05f, 8f) * animationScale, rotationZ = rotation, alpha = opacity * animationAlpha),
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = text, color = color, fontSize = size.sp,
+                text = animatedText, color = color, fontSize = size.sp,
                 fontFamily = typeface?.let { FontFamily(it) } ?: FontFamily.Default,
                 textAlign = alignment,
                 letterSpacing = (value("letterSpacing", "0").toFloatOrNull() ?: 0f).sp,
