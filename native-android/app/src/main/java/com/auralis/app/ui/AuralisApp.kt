@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +79,8 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.auralis.app.audio.AudioSessionBridge
+import com.auralis.app.export.VideoExportConfig
+import com.auralis.app.export.VisualizerVideoExporter
 import com.auralis.app.playback.AuralisPlaybackService
 import com.auralis.app.visualizer.MeasureWhat
 import com.auralis.app.visualizer.VisualizerCapture
@@ -93,6 +96,7 @@ import com.auralis.app.ui.theme.StudioWhite
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @Composable
@@ -106,6 +110,11 @@ fun AuralisApp() {
     var playbackDuration by remember { mutableLongStateOf(0L) }
     var playerMessage by remember { mutableStateOf("CONNECTING TO AUDIO ENGINE") }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val exportScope = rememberCoroutineScope()
+    var exportProgress by remember { mutableFloatStateOf(0f) }
+    var exportStatus by remember { mutableStateOf("READY TO EXPORT") }
+    var exportResolution by remember { mutableFloatStateOf(0.5f) }
+    var exportFps by remember { mutableFloatStateOf(0.2f) }
     val editorLayers = remember { mutableStateListOf(EditorLayer(1, "Composition", "Main Composition"), EditorLayer(2, "Bars", "Spectrum Bars")) }
     var selectedLayerId by remember { mutableIntStateOf(2) }
     var nextLayerId by remember { mutableIntStateOf(3) }
@@ -231,6 +240,38 @@ fun AuralisApp() {
             selectedTrackName = queryDisplayName(context, uri)
             selectedTrackUri = uri
             playerMessage = "LOADING TRACK"
+        }
+    }
+
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { outputUri ->
+        val sourceUri = selectedTrackUri
+        if (outputUri != null && sourceUri != null) {
+            exportScope.launch {
+                exportProgress = 0f
+                exportStatus = "STARTING EXPORT"
+                val sizes = listOf(1280 to 720, 1920 to 1080, 2560 to 1440, 3840 to 2160)
+                val size = sizes[(exportResolution * (sizes.size - 1)).toInt().coerceIn(0, sizes.lastIndex)]
+                val fpsValues = listOf(25, 30, 50, 60)
+                val fps = fpsValues[(exportFps * (fpsValues.size - 1)).toInt().coerceIn(0, fpsValues.lastIndex)]
+                runCatching {
+                    VisualizerVideoExporter.export(
+                        context = context,
+                        audioUri = sourceUri,
+                        outputUri = outputUri,
+                        config = VideoExportConfig(width = size.first, height = size.second, fps = fps, includeAudio = true)
+                    ) { progress, message ->
+                        exportProgress = progress
+                        exportStatus = message
+                    }
+                }.onSuccess {
+                    exportProgress = 1f
+                    exportStatus = "MP4 SAVED"
+                }.onFailure { error ->
+                    exportStatus = "EXPORT FAILED: ${error.message ?: "UNKNOWN ERROR"}"
+                }
+            }
+        } else {
+            exportStatus = "IMPORT AN AUDIO TRACK FIRST"
         }
     }
 
@@ -594,10 +635,33 @@ fun AuralisApp() {
                             Text("Only implemented effects will be marked as active.", color = StudioMuted, fontSize = 8.sp)
                         }
                         else -> {
-                            PropertyInfoRow("Interface", "Monochrome studio")
+                            PropertyInfoRow("Interface", "Monochrome compact studio")
                             PropertyInfoRow("Preview layout", "40% preview / 60% controls")
-                            PropertyInfoRow("Rendering", "OpenGL ES 2.0")
-                            PropertyInfoRow("Video export", "Not implemented yet")
+                            PropertyInfoRow("Preview renderer", "OpenGL ES 2.0")
+                            Text("VIDEO EXPORT", color = StudioAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            PropertySlider("Output resolution", exportResolution, { exportResolution = it }, "720P", "4K", listOf("720P", "1080P", "1440P", "4K")[(exportResolution * 3).toInt().coerceIn(0,3)], resetValue = 0.33f)
+                            PropertySlider("Frame rate", exportFps, { exportFps = it }, "25 FPS", "60 FPS", "${listOf(25,30,50,60)[(exportFps * 3).toInt().coerceIn(0,3)]} FPS", resetValue = 0.2f)
+                            Button(
+                                onClick = {
+                                    if (selectedTrackUri != null) exportPicker.launch("Auralis-${System.currentTimeMillis()}.mp4")
+                                    else exportStatus = "IMPORT AN AUDIO TRACK FIRST"
+                                },
+                                enabled = exportStatus != "RENDERING VIDEO",
+                                colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack),
+                                shape = RoundedCornerShape(2.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("EXPORT AUDIO-REACTIVE MP4", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                            androidx.compose.material3.LinearProgressIndicator(
+                                progress = { exportProgress.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth().height(3.dp),
+                                color = StudioAccent,
+                                trackColor = StudioBlack
+                            )
+                            PropertyInfoRow("Export status", exportStatus)
+                            PropertyInfoRow("Encoder", "MediaCodec AVC + EGL / GPU")
+                            PropertyInfoRow("Audio", "Original selected track / muxed")
+                            PropertyInfoRow("Output", "MP4 · up to 4K · 25/30/50/60 FPS")
+                            Text("This export renders the FFT-reactive spectrum bars and muxes the original audio. Text, image and other editor layers are not yet included in the export compositor.", color = StudioMuted, fontSize = 8.sp)
                         }
                     }
                 }
