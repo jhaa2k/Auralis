@@ -293,7 +293,7 @@ object VisualizerVideoExporter {
                             if(top>bottom) {
                                 fun segmentChannel(shift:Int) =
                                     ((((style.colorFrom shr shift) and 255).toFloat() +
-                                        (((style.colorTo shr shift) and 255).toFloat()-((style.colorFrom shr shift) and 255).toFloat())*progress)/255f)
+                                        (((style.colorTo shr shift) and 255).toFloat()-((style.colorFrom shr shift) and 255).toFloat())*colorProgress)/255f)
                                 val sr=segmentChannel(16); val sg=segmentChannel(8); val sb=segmentChannel(0)
                                 val alpha=config.opacity*segmentChannel(24)
                                 if (config.glow > 0f) quad(left-.008f,bottom-.008f,right+.008f,top+.008f,sr,sg,sb,alpha*config.glow*.2f,config)
