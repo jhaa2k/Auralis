@@ -52,7 +52,7 @@ private val modules: Map<String,ModuleSpec> = listOf(
     )))),
     ModuleSpec("TEXT", listOf(general(), AccordionSpec("Appearance", listOf(
         f("Text",SettingKind.TEXT,"%title%  •  %artist%"), f("Color",SettingKind.COLOR,"#FFFFFFFF"),
-        f("Font Size",SettingKind.SLIDER,"30"), f("Type Face",SettingKind.TEXT,"Default")
+        f("Font Size",SettingKind.SLIDER,"30"), f("Type Face",SettingKind.DROPDOWN,"Default",listOf("Default","Sans Serif","Serif","Monospace","Cursive"))
     )))),
     ModuleSpec("BARS", listOf(general(), AccordionSpec("Bars", listOf(
         f("Flip Input",SettingKind.CHECK,"false"), f("Height Scale",SettingKind.SLIDER,"10"), f("Min Height Scale",SettingKind.SLIDER,"0"),
