@@ -354,7 +354,7 @@ object VisualizerVideoExporter {
             buf.position(2)
             GLES20.glVertexAttribPointer(col,4,GLES20.GL_FLOAT,false,24,buf)
             val rgb = configs.firstOrNull { it.rgbSplitAmount > 0f }
-            val rgbActive = rgb != null && (!rgb.rgbSplitOnBeat || bands.average() > 0.15f)
+            val rgbActive = rgb != null && (!rgb.rgbSplitOnBeat || bands.average().toFloat() > 0.15f)
             if (rgbActive && rgb != null) {
                 val shift = 0.002f + rgb.rgbSplitAmount * 0.028f
                 val angle = Math.toRadians(rgb.rgbSplitAngle.toDouble())
