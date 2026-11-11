@@ -332,7 +332,8 @@ object VisualizerVideoExporter {
                         fun effectChannel(color: Long, shift: Int) = ((color shr shift) and 255).toFloat()/255f
                         fun drawGlow() {
                             if (config.glow <= 0f) return
-                            quad(left-.006f,base-.008f,right+.006f,base+height+.008f,
+                            val glowSpread = .002f + config.glowRadius / 100f * .04f
+                            quad(left-glowSpread,base-glowSpread*1.25f,right+glowSpread,base+height+glowSpread*1.25f,
                                 effectChannel(config.blurColor,16),effectChannel(config.blurColor,8),effectChannel(config.blurColor,0),
                                 config.opacity*config.compositionAlpha*config.glow*.22f*effectChannel(config.blurColor,24),config)
                         }
