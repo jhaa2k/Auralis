@@ -3,7 +3,6 @@ package com.auralis.app.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.text.font.FontFamily
 
 private val StudioScheme = darkColorScheme(
     primary = StudioAccent,
@@ -21,7 +20,7 @@ private val StudioScheme = darkColorScheme(
 fun AuralisTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = StudioScheme,
-        typography = androidx.compose.material3.Typography(fontFamily = FontFamily.SansSerif),
+        typography = androidx.compose.material3.Typography(),
         content = content
     )
 }
