@@ -294,56 +294,92 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         onDispose { capture.stop() }
     }
 
-    val barsModule = ModuleCatalog.modules.first { it.id == "BARS" }
-    fun layerSetting(key: String, fallback: String): String =
-        values["$layerSettingsKey.$key"]
-            ?: values["${selectedLayer.type}.$key"]
-            ?: (if (selectedLayer.type == "BARS") values["BARS.$key"] else null)
-            ?: (if (selectedLayer.type == "BARS") {
-                barsModule.groups.flatMap { it.settings }
-                    .firstOrNull { it.key == key }?.defaultValue?.takeIf { it.isNotBlank() }
-            } else null)
-            ?: fallback
-    fun layerFloat(key: String, fallback: Float): Float =
-        layerSetting(key, fallback.toString()).toFloatOrNull() ?: fallback
-    fun layerBool(key: String, fallback: Boolean = false): Boolean =
-        layerSetting(key, fallback.toString()).toBooleanStrictOrNull() ?: fallback
-
-    val layerVisible = layerBool("visible", true)
-    val liveSettings = remember(values, selectedLayerId, selectedLayer.type, playbackPosition, playbackDuration) {
-        val enabledSegments = (1..3).count { layerBool("segment${it}Enabled", it == 1) }
-        VisualizerSettings(
-            barCount = layerFloat("barCount", 64f).toInt().coerceIn(16, 128),
-            barWidth = layerFloat("barWidth", 0.72f).coerceIn(0.15f, 1f),
-            barHeight = layerFloat("heightScale", 1f).coerceIn(0.1f, 2f),
-            segmentCount = enabledSegments.coerceAtLeast(1),
-            segmentGap = layerFloat("barSpacing", 0.18f).coerceIn(0f, 0.45f),
-            sensitivity = layerFloat("maxHeightScale", 1f).coerceIn(0.1f, 4f),
-            smoothing = layerFloat("softness", 0.35f).coerceIn(0f, 0.95f),
-            positionX = layerFloat("positionX", 0.5f),
-            positionY = layerFloat("positionY", 0.5f),
-            scale = layerFloat("scaleX", 1f).coerceIn(0.1f, 3f),
-            rotation = layerFloat("rotation", 0f),
-            mirror = layerBool("mirrorX") || layerBool("mirrorY"),
-            particlesEnabled = selectedLayer.type == "PARTICLES" && layerVisible,
-            particleCount = layerFloat("countLimit", 120f).toInt().coerceIn(0, 400),
-            particleSpeed = layerFloat("speed", 1f).coerceIn(0.1f, 4f),
-            particleSize = layerFloat("startSize", 3f).coerceIn(1f, 12f),
-            particleSpread = layerFloat("amountX", 0.8f).coerceIn(0.1f, 2f),
-            particlePositionX = layerFloat("positionX", 0.5f),
-            particlePositionY = layerFloat("positionY", 0.5f),
-            particleScale = layerFloat("particleScale", 1f).coerceIn(0.1f, 3f),
-            rgbSplitAmount = if (selectedLayer.type == "RGBSPLITEFFECT") {
-                layerFloat("splitAmount", 0f).coerceIn(0f, 1f)
-            } else 0f,
-            trackPositionFraction = if (playbackDuration > 0L) {
-                (playbackPosition.toFloat() / playbackDuration).coerceIn(0f, 1f)
-            } else 0f,
-            barsEnabled = selectedLayer.type == "BARS" && layerVisible
-        ).sanitized()
+    fun settingsForLayer(layer: SavedLayerRecord): VisualizerSettings? {
+        val spec = ModuleCatalog.modules.firstOrNull { it.id == layer.type } ?: return null
+        val key = if (layer.id == 1 && layer.type == "BARS") "BARS" else "layer_${layer.id}_${layer.type}"
+        fun raw(name: String, fallback: String): String =
+            values["$key.$name"] ?: values["${layer.type}.$name"]
+                ?: spec.groups.flatMap { it.settings }.firstOrNull { it.key == name }?.defaultValue?.takeIf { it.isNotBlank() }
+                ?: fallback
+        fun number(name: String, fallback: Float): Float = raw(name, fallback.toString()).toFloatOrNull() ?: fallback
+        fun flag(name: String, fallback: Boolean = false): Boolean = raw(name, fallback.toString()).toBooleanStrictOrNull() ?: fallback
+        fun argb(name: String, fallback: Long): Long = runCatching {
+            android.graphics.Color.parseColor(raw(name, String.format("#%08X", fallback))) .toLong() and 0xFFFFFFFFL
+        }.getOrDefault(fallback)
+        val visible = flag("visible", true)
+        val measurePosition = MeasureWhat.fromLabel(raw("measurePos", "Nothing"))
+        val measureScale = MeasureWhat.fromLabel(raw("measureScale", "Nothing"))
+        val measureRotation = MeasureWhat.fromLabel(raw("measureRot", "Nothing"))
+        val globalMirror = layers.any { it.type == "MIRROREREFFECT" && runCatching {
+            val effectKey = "layer_${it.id}_${it.type}"
+            values["$effectKey.visible"]?.toBooleanStrictOrNull() ?: true
+        }.getOrDefault(false) }
+        val rgbAmount = layers.firstOrNull { it.type == "RGBSPLITEFFECT" }?.let { effect ->
+            val effectKey = "layer_${effect.id}_${effect.type}"
+            (values["$effectKey.splitAmount"] ?: values["RGBSPLITEFFECT.splitAmount"])?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
+        } ?: 0f
+        return when (layer.type) {
+            "BARS" -> {
+                val segments = (1..3).count { flag("segment${it}Enabled", it == 1) }.coerceAtLeast(1)
+                VisualizerSettings(
+                    barCount = number("barCount", 64f).toInt().coerceIn(16, 128),
+                    barWidth = number("barWidth", 0.72f).coerceIn(0.15f, 1f),
+                    barHeight = number("heightScale", 1f).coerceIn(0.1f, 2f),
+                    barMinHeight = number("minHeightScale", 0f).coerceIn(0f, 1f),
+                    flipInput = flag("flipInput"),
+                    barColorFrom = argb("segment1ColorFrom", 0xFFFFFFFFL),
+                    barColorTo = argb("segment1ColorTo", 0xFF00FFFFL),
+                    segmentCount = segments,
+                    segmentGap = number("barSpacing", 0.18f).coerceIn(0f, 0.45f),
+                    sensitivity = number("maxHeightScale", 1f).coerceIn(0.1f, 4f),
+                    smoothing = number("softness", 0.35f).coerceIn(0f, 0.95f),
+                    opacity = number("alpha", 1f).coerceIn(0f, 1f),
+                    glow = number("glow", 0.25f).coerceIn(0f, 1f),
+                    positionX = number("positionX", 0.5f),
+                    positionY = number("positionY", 0.5f),
+                    scale = ((number("scaleX", 1f) + number("scaleY", 1f)) / 2f).coerceIn(0.1f, 3f),
+                    rotation = number("rotation", 0f),
+                    mirror = flag("mirrorX") || flag("mirrorY") || globalMirror,
+                    positionMeasure = measurePosition,
+                    scaleMeasure = measureScale,
+                    rotationMeasure = measureRotation,
+                    measureAmount = number("measureAmount", 0.5f),
+                    beatSensitivity = number("beatRangeValueLower", 0.55f).coerceIn(0f, 1f),
+                    rgbSplitAmount = rgbAmount,
+                    barsEnabled = visible
+                )
+            }
+            "PARTICLES" -> VisualizerSettings(
+                positionX = number("positionX", 0.5f),
+                positionY = number("positionY", 0.5f),
+                particlesEnabled = visible,
+                particleCount = number("countLimit", 120f).toInt().coerceIn(0, 400),
+                particleSpeed = number("speed", 1f).coerceIn(0.1f, 4f),
+                particleSize = number("startSize", 3f).coerceIn(1f, 12f),
+                particleSpread = number("amountX", 0.8f).coerceIn(0.1f, 2f),
+                particleOpacity = number("opacityStrength", 1f).coerceIn(0f, 1f),
+                particleColor = argb("color", 0xFFFFFFFFL),
+                particlePositionX = number("positionX", 0.5f),
+                particlePositionY = number("positionY", 0.5f),
+                particleScale = number("particleScale", 1f).coerceIn(0.1f, 3f),
+                particlePositionMeasure = measurePosition,
+                particleScaleMeasure = measureScale,
+                particleRotationMeasure = measureRotation,
+                particleMeasureAmount = number("measureAmount", 0.5f),
+                beatSensitivity = number("beatRangeValueLower", 0.55f).coerceIn(0f, 1f)
+            )
+            else -> null
+        }
     }
-    SideEffect { previewSurface?.updateSettings(liveSettings) }
-
+    val liveLayerSettings = remember(values, layers, playbackPosition, playbackDuration) {
+        layers.mapNotNull { settingsForLayer(it) }.map { config ->
+            config.copy(trackPositionFraction = if (playbackDuration > 0L) {
+                (playbackPosition.toFloat() / playbackDuration).coerceIn(0f, 1f)
+            } else 0f).sanitized()
+        }
+    }
+    val liveSettings = liveLayerSettings.firstOrNull() ?: VisualizerSettings(barsEnabled = false)
+    SideEffect { previewSurface?.updateLayers(liveLayerSettings) }
     val pageTitle = when (selectedTab) {
         EditorTab.STUDIO -> "LIVE VISUALIZER EDITOR"
         EditorTab.ELEMENTS -> "ADD OR EDIT ELEMENTS"
@@ -428,7 +464,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 hasAudio = selectedAudioUri != null,
                 audioSessionActive = audioSessionId > 0,
                 previewSurface = { previewSurface = it },
-                settings = liveSettings
+                layerSettings = liveLayerSettings
             )
 
             Column(
@@ -627,7 +663,7 @@ private fun PreviewPane(
     hasAudio: Boolean,
     audioSessionActive: Boolean,
     previewSurface: (VisualizerSurface) -> Unit,
-    settings: VisualizerSettings
+    layerSettings: List<VisualizerSettings>
 ) {
     Column(
         modifier = modifier
@@ -687,12 +723,12 @@ private fun PreviewPane(
                     factory = { viewContext ->
                         VisualizerSurface(viewContext).also {
                             previewSurface(it)
-                            it.updateSettings(settings)
+                            it.updateLayers(layerSettings)
                         }
                     },
                     update = {
                         previewSurface(it)
-                        it.updateSettings(settings)
+                        it.updateLayers(layerSettings)
                     },
                     modifier = Modifier.fillMaxSize()
                 )
