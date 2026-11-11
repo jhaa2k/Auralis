@@ -322,7 +322,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         } else {
             val key = "layer_${provider.id}_${provider.type}"
             fun read(name: String, fallback: Float) = (values["$key.$name"] ?: values["AUDIOPROVIDER.$name"])?.toFloatOrNull() ?: fallback
-            val sourceMode = values["$key.measureSource"] ?: values["AUDIOPROVIDER.measureSource"] ?: "Bass"
+            val sourceMode = values["$key.measureSource"] ?: values["AUDIOPROVIDER.measureSource"] ?: "Spectrum"
             val manualLow = read("lowerHz", 20f).coerceIn(20f, 19000f)
             val manualHigh = read("higherHz", 18000f).coerceIn(manualLow + 1f, 20000f)
             val range = when (sourceMode) {
