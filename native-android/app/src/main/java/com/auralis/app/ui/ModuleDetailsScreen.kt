@@ -159,12 +159,12 @@ internal fun ModuleDetailsScreen(
     var expanded by remember(module, layerId) { mutableStateOf(spec.groups.firstOrNull()?.title.orEmpty()) }
     var info by remember { mutableStateOf(false) }
     val prefix = "$layerId/"
-    fun read(field: SettingSpec): String {
-        val key = prefix + field.name
+    fun read(group: AccordionSpec, field: SettingSpec): String {
+        val key = prefix + group.title + "/" + field.name
         if (!values.containsKey(key)) values[key] = field.defaultValue
         return values[key] ?: field.defaultValue
     }
-    fun write(field: SettingSpec, value: String) { values[prefix + field.name] = value }
+    fun write(group: AccordionSpec, field: SettingSpec, value: String) { values[prefix + group.title + "/" + field.name] = value }
     Column(Modifier.fillMaxSize().background(StudioBlack).padding(14.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("‹", color = StudioWhite, fontSize = 28.sp, modifier = Modifier.clickable { onBack() }.padding(end=16.dp))
@@ -189,12 +189,12 @@ internal fun ModuleDetailsScreen(
                             Divider(color=StudioLine)
                             Column(Modifier.padding(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                                 group.settings.forEach { field ->
-                                    val value=read(field)
+                                    val value=read(group,field)
                                     Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                                         Text(field.name,color=StudioMuted,fontSize=9.sp,fontWeight=FontWeight.Medium)
                                         when(field.kind) {
                                             SettingKind.CHECK -> Row(verticalAlignment=Alignment.CenterVertically) {
-                                                Checkbox(checked=value.toBoolean(),onCheckedChange={write(field,it.toString())},colors=CheckboxDefaults.colors(checkedColor=StudioAccent,checkmarkColor=StudioBlack))
+                                                Checkbox(checked=value.toBoolean(),onCheckedChange={write(group,field,it.toString())},colors=CheckboxDefaults.colors(checkedColor=StudioAccent,checkmarkColor=StudioBlack))
                                                 Text(if(value.toBoolean()) "Enabled" else "Disabled",color=StudioWhite,fontSize=9.sp)
                                             }
                                             SettingKind.DROPDOWN -> {
@@ -205,7 +205,7 @@ internal fun ModuleDetailsScreen(
                                                         Spacer(Modifier.weight(1f)); Text("▾",color=StudioAccent)
                                                     }
                                                     DropdownMenu(expanded=open,onDismissRequest={open=false}) {
-                                                        field.options.forEach { option -> DropdownMenuItem(text={Text(option,fontSize=10.sp)},onClick={write(field,option);open=false}) }
+                                                        field.options.forEach { option -> DropdownMenuItem(text={Text(option,fontSize=10.sp)},onClick={write(group,field,option);open=false}) }
                                                     }
                                                 }
                                             }
@@ -223,20 +223,20 @@ internal fun ModuleDetailsScreen(
                                                     else -> maxOf(1f, (field.defaultValue.toFloatOrNull() ?: 1f) * 2f)
                                                 }
                                                 Row(verticalAlignment=Alignment.CenterVertically) {
-                                                    Slider(value=numeric.coerceIn(0f,maxValue),onValueChange={write(field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..maxValue,modifier=Modifier.weight(1f),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
+                                                    Slider(value=numeric.coerceIn(0f,maxValue),onValueChange={write(group,field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..maxValue,modifier=Modifier.weight(1f),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
                                                     Text(value,color=StudioWhite,fontSize=8.sp,modifier=Modifier.width(54.dp))
                                                 }
                                             }
                                             SettingKind.TEXT, SettingKind.NUMBER, SettingKind.COLOR, SettingKind.IMAGE, SettingKind.CODE -> {
-                                                OutlinedTextField(value=value,onValueChange={write(field,it)},modifier=Modifier.fillMaxWidth(),singleLine=field.kind!=SettingKind.CODE, minLines=if(field.kind==SettingKind.CODE) 5 else 1,
+                                                OutlinedTextField(value=value,onValueChange={write(group,field,it)},modifier=Modifier.fillMaxWidth(),singleLine=field.kind!=SettingKind.CODE, minLines=if(field.kind==SettingKind.CODE) 5 else 1,
                                                     label={Text(when(field.kind){SettingKind.COLOR->"Hex color (#RRGGBB or #AARRGGBB)";SettingKind.IMAGE->"Image URI / selected asset";SettingKind.NUMBER->"Numeric value";SettingKind.CODE->"GLSL source";else->"Value"},fontSize=8.sp)},
                                                     colors=OutlinedTextFieldDefaults.colors(focusedTextColor=StudioWhite,unfocusedTextColor=StudioWhite,focusedBorderColor=StudioAccent,unfocusedBorderColor=StudioLine,focusedLabelColor=StudioAccent,unfocusedLabelColor=StudioMuted))
-                                                if(field.kind==SettingKind.IMAGE) TextButton(onClick={onPickImage(field.name)}) { Text("CHOOSE IMAGE",color=StudioAccent,fontSize=8.sp) }
+                                                if(field.kind==SettingKind.IMAGE) TextButton(onClick={onPickImage(group.title + "/" + field.name)}) { Text("CHOOSE IMAGE",color=StudioAccent,fontSize=8.sp) }
                                                 if(field.kind==SettingKind.COLOR) {
                                                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically) {
                                                         listOf("#FFFFFFFF","#FF000000","#FFFF3B30","#FF34C759","#FF007AFF","#FF00D9FF","#FFFF2D95","#FFFFCC00").forEach { hex ->
                                                             Surface(
-                                                                modifier=Modifier.size(22.dp).clickable { write(field,hex) },
+                                                                modifier=Modifier.size(22.dp).clickable { write(group,field,hex) },
                                                                 color=runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(StudioWhite),
                                                                 border=BorderStroke(1.dp,StudioLine),
                                                                 shape=RoundedCornerShape(2.dp)
