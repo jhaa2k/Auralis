@@ -7,25 +7,25 @@ package com.auralis.app.visualizer
  * not considered operational until a renderer or audio processor consumes it.
  */
 enum class MeasureWhat(val label: String) {
-    NOTHING("Nothing"),
-    BEAT("Beat"),
-    TOTAL_TIME("TotalTime"),
-    TOTAL_TIME_BACKWARD("TotalTimeBackward"),
-    TOTAL_TIME_WHEN_PLAYING("TotalTimeWhenPlaying"),
-    TOTAL_TIME_AND_BEAT("TotalTimeAndBeat"),
-    TRACK_POSITION("TrackPosition"),
-    BEAT_RANDOM_SHAKE("BeatRandomShake"),
-    BEAT_CAM_SHAKE_ROT_MORE("BeatCamShakeRotMore"),
-    BEAT_CAM_SHAKE_ROT_LESS("BeatCamShakeRotLess"),
-    CONSTANT_SHAKE_ROT_MORE("ConstantShakeRotMore"),
-    CONSTANT_SHAKE_ROT_LESS("ConstantShakeRotLess"),
-    BEAT_TRIGGER_ANIM("BeatTriggerAnim");
-
+    NOTHING("Nothing"), BEAT("Beat"),
+    TOTAL_TIME("TotalTime"), TOTAL_TIME_BACKWARD("TotalTimeBackward"),
+    TOTAL_TIME_WHEN_PLAYING("TotalTimeWhenPlaying"), TOTAL_TIME_AND_BEAT("TotalTimeAndBeat"),
+    TRACK_POSITION("TrackPosition"), BEAT_RANDOM_SHAKE("BeatRandomShake"),
+    BEAT_CAM_SHAKE_ROT_MORE("BeatCamShakeRotMore"), BEAT_CAM_SHAKE_ROT_LESS("BeatCamShakeRotLess"),
+    CONSTANT_SHAKE_ROT_MORE("ConstantShakeRotMore"), CONSTANT_SHAKE_ROT_LESS("ConstantShakeRotLess"),
+    BEAT_TRIGGER_ANIM("BeatTriggerAnim"), BEAT_CAM_SHAKE_ONLY("BeatCamShakeOnly"),
+    BEAT_PULSE_SCALE("BeatPulseScale"), BEAT_FLASH_COLOR("BeatFlashColor"),
+    BEAT_GLOW_INTENSITY("BeatGlowIntensity"), BEAT_HORIZONTAL_STRETCH("BeatHorizontalStretch"),
+    BEAT_VERTICAL_BOUNCE("BeatVerticalBounce"), CONSTANT_SLOW_ROTATE("ConstantSlowRotate"),
+    CONSTANT_ORBIT_MOVE("ConstantOrbitMove"), CONSTANT_LINEAR_SCROLL("ConstantLinearScroll"),
+    TRACK_PROGRESS_PERCENTAGE("TrackProgressPercentage"), TRACK_REMAINING_TIME("TrackRemainingTime"),
+    TRACK_INTRO_OUTRO_TRIGGER("TrackIntroOutroTrigger"), VOLUME_LEVEL_RESPONSIVE("VolumeLevelResponsive"),
+    PITCH_FREQUENCY_RESPONSIVE("PitchFrequencyResponsive");
     companion object {
-        val dropdownOptions: List<String> = entries.map { it.label }
+        val dropdownOptions: List<String> = values().map { it.label }
+        fun fromLabel(value: String): MeasureWhat = values().firstOrNull { it.label.equals(value, true) } ?: NOTHING
     }
 }
-
 enum class LayerBlendMode(val label: String) {
     ALPHA("Alpha"), ADD("Add"), SCREEN("Screen"), PRE_MUL_ALPHA("PreMulAlpha")
 }
