@@ -26,7 +26,7 @@ class VisualizerCapture(
 
     fun configure(smoothing: Float, gain: Float, lowFrequencyFraction: Float, highFrequencyFraction: Float, measureSource: String = "Spectrum") {
         this.smoothing = smoothing.coerceIn(0f, 0.95f)
-        this.gain = gain.coerceIn(0.1f, 4f)
+        this.gain = gain.coerceIn(0f, 4f)
         this.lowFrequencyFraction = lowFrequencyFraction.coerceIn(0f, 0.95f)
         this.highFrequencyFraction = highFrequencyFraction.coerceIn(this.lowFrequencyFraction + 0.05f, 1f)
         this.measureSource = measureSource
@@ -70,7 +70,7 @@ class VisualizerCapture(
                                 val magnitude = hypot(real.toDouble(), imaginary.toDouble()).toFloat() / 128f
                                 if (magnitude > peak) peak = magnitude
                             }
-                            result[bar] = (ln(1f + peak * gain.coerceIn(0.1f, 4f) * 8f) / ln(9f)).coerceIn(0f, 1f)
+                            result[bar] = (ln(1f + peak * gain.coerceIn(0f, 4f) * 8f) / ln(9f)).coerceIn(0f, 1f)
                         }
                         when (measureSource) {
                             "Volume" -> {
