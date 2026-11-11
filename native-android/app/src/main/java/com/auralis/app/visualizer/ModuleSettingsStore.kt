@@ -5,6 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
 import org.json.JSONObject
 
 /**
@@ -16,6 +20,7 @@ class ModuleSettingsStore(application: Application) : AndroidViewModel(applicati
     private val preferences = application.getSharedPreferences("auralis_module_settings_v1", 0)
     private val _values = MutableStateFlow<Map<String, String>>(emptyMap())
     val values: StateFlow<Map<String, String>> = _values.asStateFlow()
+    private var persistJob: Job? = null
 
     init {
         // SharedPreferences.getString is a memory read. Restore synchronously so the first
@@ -29,6 +34,14 @@ class ModuleSettingsStore(application: Application) : AndroidViewModel(applicati
             restored[key] = json.optString(key, "")
         }
         _values.value = restored
+    }
+
+    private fun persistDebounced(snapshot: Map<String, String>) {
+        persistJob?.cancel()
+        persistJob = viewModelScope.launch {
+            delay(180)
+            persist(snapshot)
+        }
     }
 
     private fun persist(snapshot: Map<String, String>) {
@@ -74,14 +87,20 @@ class ModuleSettingsStore(application: Application) : AndroidViewModel(applicati
         val key = "$moduleId.${spec.key}"
         val next = _values.value.toMutableMap().apply { put(key, value) }
         _values.value = next
-        persist(next)
+        persistDebounced(next)
     }
 
     fun reset(moduleId: String, groups: List<SettingGroup>) {
         val next = _values.value.toMutableMap()
         groups.flatMap { it.settings }.forEach { next.remove("$moduleId.${it.key}") }
         _values.value = next
-        persist(next)
+        persistDebounced(next)
+    }
+
+    override fun onCleared() {
+        persistJob?.cancel()
+        persist(_values.value)
+        super.onCleared()
     }
 
     fun exportJson(): String = JSONObject().apply {
