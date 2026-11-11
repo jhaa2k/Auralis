@@ -14,10 +14,12 @@ import java.nio.FloatBuffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.*
+import com.auralis.app.visualizer.VisualizerSettings
 
 data class VideoExportConfig(
     val width: Int = 1920, val height: Int = 1080, val fps: Int = 30,
-    val bitrate: Int = 8_000_000, val includeAudio: Boolean = true
+    val bitrate: Int = 8_000_000, val includeAudio: Boolean = true,
+    val visualizerLayers: List<VisualizerSettings> = emptyList()
 ) {
     fun safe() = copy(width = width.coerceIn(640,3840), height = height.coerceIn(480,2160),
         fps = listOf(25,30,50,60).minBy { abs(it-fps) }, bitrate = bitrate.coerceIn(900_000,35_000_000))
@@ -135,7 +137,7 @@ object VisualizerVideoExporter {
             }
             for(i in 0 until total){val pts=i.toLong()*1_000_000/c.fps
                 val bi=(pts*a.sampleRate/(1024L*1_000_000)).toInt().coerceIn(0,a.bands.lastIndex)
-                gl.draw(a.bands[bi]);EGLExt.eglPresentationTimeANDROID(gl.display,gl.surface,pts*1000)
+                gl.draw(a.bands[bi], c.visualizerLayers);EGLExt.eglPresentationTimeANDROID(gl.display,gl.surface,pts*1000)
                 check(EGL14.eglSwapBuffers(gl.display,gl.surface));drain()
                 if(i%c.fps==0)progress(i.toFloat()/total)}
             codec.signalEndOfInputStream()
