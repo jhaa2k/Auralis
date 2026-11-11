@@ -1,6 +1,14 @@
 package com.auralis.app.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -166,33 +174,33 @@ internal fun ModuleDetailsScreen(
         return values[key] ?: field.defaultValue
     }
     fun write(group: AccordionSpec, field: SettingSpec, value: String) { values[prefix + group.title + "/" + field.name] = value; onPropertyChange(group.title, field.name, value) }
-    Column(Modifier.fillMaxSize().background(StudioBlack).padding(14.dp)) {
+    Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(StudioPanel, StudioBlack))).padding(horizontal=16.dp, vertical=12.dp)) {
         Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("‹", color = StudioWhite, fontSize = 28.sp, modifier = Modifier.clickable { onBack() }.padding(end=16.dp))
+            Surface(color=StudioRaised, shape=RoundedCornerShape(4.dp), modifier=Modifier.size(38.dp).clickable { onBack() }) { Box(contentAlignment=Alignment.Center) { Text("‹", color = StudioWhite, fontSize = 26.sp) } }
             Column(Modifier.weight(1f)) {
-                Text(spec.title, color=StudioWhite,fontSize=14.sp,fontWeight=FontWeight.Black,letterSpacing=1.sp)
-                Text("LAYER $layerId  /  PROPERTIES",color=StudioMuted,fontSize=8.sp)
+                Text(spec.title.replace(Regex("([A-Z])"), " $1").trim(), color=StudioWhite,fontSize=15.sp,fontWeight=FontWeight.Bold,letterSpacing=0.4.sp)
+                Text("LAYER $layerId  ·  LIVE SETTINGS",color=StudioMuted,fontSize=9.sp)
             }
-            TextButton(onClick=onReset) { Text("↺",color=StudioWhite,fontSize=20.sp) }
+            TextButton(onClick=onReset) { Text("RESET",color=StudioMuted,fontSize=9.sp,fontWeight=FontWeight.Bold) }
             TextButton(onClick={info=true}) { Text("ⓘ",color=StudioWhite,fontSize=18.sp) }
         }
         Divider(color=StudioLine)
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top=10.dp), verticalArrangement=Arrangement.spacedBy(7.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top=12.dp, bottom=24.dp), verticalArrangement=Arrangement.spacedBy(9.dp)) {
             spec.groups.forEach { group ->
-                Surface(color=StudioPanel, border=BorderStroke(1.dp,StudioLine), shape=RoundedCornerShape(2.dp), modifier=Modifier.fillMaxWidth()) {
+                Surface(color=StudioBlack.copy(alpha=0.72f), border=BorderStroke(1.dp,StudioLine.copy(alpha=0.75f)), shape=RoundedCornerShape(5.dp), modifier=Modifier.fillMaxWidth()) {
                     Column {
-                        Row(Modifier.fillMaxWidth().height(44.dp).clickable { expanded=if(expanded==group.title) "" else group.title }.padding(horizontal=12.dp), verticalAlignment=Alignment.CenterVertically) {
-                            Text(group.title.uppercase(Locale.US),color=StudioWhite,fontSize=10.sp,fontWeight=FontWeight.Bold,letterSpacing=0.8.sp)
+                        Row(Modifier.fillMaxWidth().height(50.dp).clickable { expanded=if(expanded==group.title) "" else group.title }.padding(horizontal=14.dp), verticalAlignment=Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) { Text(group.title,color=StudioWhite,fontSize=12.sp,fontWeight=FontWeight.SemiBold); Text("${group.settings.size} SETTINGS",color=StudioMuted,fontSize=8.sp,letterSpacing=0.8.sp) }
                             Spacer(Modifier.weight(1f))
-                            Text(if(expanded==group.title) "−" else "+",color=StudioAccent,fontSize=18.sp)
+                            Surface(color=if(expanded==group.title) StudioAccent.copy(alpha=0.16f) else StudioRaised, shape=CircleShape, modifier=Modifier.size(26.dp)) { Box(contentAlignment=Alignment.Center) { Text(if(expanded==group.title) "−" else "+",color=StudioAccent,fontSize=16.sp) } }
                         }
                         if(expanded==group.title) {
                             Divider(color=StudioLine)
-                            Column(Modifier.padding(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                            Column(Modifier.padding(horizontal=13.dp, vertical=12.dp),verticalArrangement=Arrangement.spacedBy(13.dp)) {
                                 group.settings.forEach { field ->
                                     val value=read(group,field)
                                     Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                                        Text(field.name,color=StudioMuted,fontSize=9.sp,fontWeight=FontWeight.Medium)
+                                        Text(field.name,color=StudioWhite,fontSize=10.sp,fontWeight=FontWeight.Medium)
                                         when(field.kind) {
                                             SettingKind.CHECK -> Row(verticalAlignment=Alignment.CenterVertically) {
                                                 Checkbox(checked=value.toBoolean(),onCheckedChange={write(group,field,it.toString())},colors=CheckboxDefaults.colors(checkedColor=StudioAccent,checkmarkColor=StudioBlack))
@@ -201,7 +209,7 @@ internal fun ModuleDetailsScreen(
                                             SettingKind.DROPDOWN -> {
                                                 var open by remember(field.name) { mutableStateOf(false) }
                                                 Box {
-                                                    OutlinedButton(onClick={open=true},modifier=Modifier.fillMaxWidth(),border=BorderStroke(1.dp,StudioLine),shape=RoundedCornerShape(2.dp),colors=ButtonDefaults.outlinedButtonColors(contentColor=StudioWhite)) {
+                                                    OutlinedButton(onClick={open=true},modifier=Modifier.fillMaxWidth(),border=BorderStroke(1.dp,StudioLine),shape=RoundedCornerShape(4.dp),colors=ButtonDefaults.outlinedButtonColors(contentColor=StudioWhite)) {
                                                         Text(value.ifBlank { field.options.firstOrNull().orEmpty() },fontSize=9.sp)
                                                         Spacer(Modifier.weight(1f)); Text("▾",color=StudioAccent)
                                                     }
@@ -224,8 +232,8 @@ internal fun ModuleDetailsScreen(
                                                     else -> maxOf(1f, (field.defaultValue.toFloatOrNull() ?: 1f) * 2f)
                                                 }
                                                 Row(verticalAlignment=Alignment.CenterVertically) {
-                                                    Slider(value=numeric.coerceIn(0f,maxValue),onValueChange={write(group,field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..maxValue,modifier=Modifier.weight(1f),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
-                                                    Text(value,color=StudioWhite,fontSize=8.sp,modifier=Modifier.width(54.dp))
+                                                    Slider(value=numeric.coerceIn(0f,maxValue),onValueChange={write(group,field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..maxValue,modifier=Modifier.weight(1f).height(22.dp),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
+                                                    Text(value,color=StudioAccent,fontSize=9.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.width(58.dp))
                                                 }
                                             }
                                             SettingKind.TEXT, SettingKind.NUMBER, SettingKind.COLOR, SettingKind.IMAGE, SettingKind.CODE -> {
@@ -244,7 +252,7 @@ internal fun ModuleDetailsScreen(
                                                             ) {}
                                                         }
                                                     }
-                                                    Text("HEX OUTPUT: $value",color=StudioMuted,fontSize=8.sp)
+                                                    Text("RGBA HEX  ·  $value",color=StudioMuted,fontSize=8.sp,letterSpacing=0.5.sp)
                                                 }
                                             }
                                         }
