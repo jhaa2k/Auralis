@@ -191,8 +191,11 @@ object VisualizerVideoExporter {
             val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
             val requiredFloats = configs.sumOf { layer ->
                 val segmentStyles = layer.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
+                val mirrorY = layer.mirror || segmentStyles.any { it.mirror }
+                val mirrorCopies = 1 + (if (mirrorY) 1 else 0) + (if (layer.mirrorX) 1 else 0) +
+                    (if (mirrorY && layer.mirrorX) 1 else 0)
                 val bars = if (layer.barsEnabled) layer.barCount.coerceIn(16,128) *
-                    (segmentStyles.size * 20 + 4) * 18 else 0
+                    (segmentStyles.size * 20 * mirrorCopies + 4) * 18 else 0
                 val particleMirrors = 1 + (if (layer.particleMirrorX) 1 else 0) +
                     (if (layer.particleMirrorY) 1 else 0) +
                     (if (layer.particleMirrorX && layer.particleMirrorY) 1 else 0)
