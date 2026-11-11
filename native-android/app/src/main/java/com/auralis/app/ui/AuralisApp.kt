@@ -443,6 +443,7 @@ fun AuralisApp() {
                             y = imageLayer.y,
                             scale = imageLayer.scale,
                             rotation = imageLayer.rotation,
+                            fitMode = imageLayer.imageFitMode,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -908,10 +909,11 @@ fun AuralisApp() {
                             group == "Appearance" && activeModule == "TEXT" && field == "Text" -> layer.copy(textContent = value)
                             group == "Appearance" && activeModule == "TEXT" && field == "Font Size" -> layer.copy(fontSize = (number ?: layer.fontSize).coerceIn(8f, 96f))
                             group == "Appearance" && activeModule == "TEXT" && field == "Color" && color != null -> layer.copy(textColor = color)
+                            group == "Image" && activeModule == "IMAGE" && field == "Crop to Fit" -> layer.copy(imageFitMode = if (value.toBoolean()) "CROP_TO_FIT" else "KEEP_ASPECT_RATIO")
+                            group == "Image" && activeModule == "IMAGE" && field == "Keep Aspect Ratio" -> layer.copy(imageFitMode = if (value.toBoolean()) "KEEP_ASPECT_RATIO" else "CROP_TO_FIT")
                             group == "Overall" && activeModule == "PARTICLES" && field == "Vector Angle" -> layer.copy(particleVectorAngle = number ?: layer.particleVectorAngle)
                             group == "Overall" && activeModule == "PARTICLES" && field == "Color" && color != null -> layer.copy(particleColor = color)
                             group == "Appearance" && activeModule == "PARTICLES" && field == "Color From" && color != null -> layer.copy(particleColor = color)
-                            group == "Appearance" && activeModule == "PARTICLES" && field == "Fade In And Out Time" -> layer.copy(particleTransparency = (1f - (number ?: 0f)).coerceIn(0f, 1f))
                             group == "Appearance" && activeModule == "RGBSPLITEFFECT" && field == "Split Multiplier" -> layer.copy(rgbSplitAmount = (number ?: 0f).coerceIn(0f, 1f))
                             group == "Motion Blur" && field == "Blur Amount Multiplier" -> layer.copy(motionBlurTrailing = (number ?: 0f).coerceIn(0f, 0.65f))
                             group == "Blur" && field == "Blur Radius" -> layer.copy(blurIntensity = (number ?: 0f).coerceIn(0f, 0.65f))
@@ -950,6 +952,7 @@ private fun LayerImagePreview(
     y: Float,
     scale: Float,
     rotation: Float,
+    fitMode: String = "KEEP_ASPECT_RATIO",
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -964,7 +967,7 @@ private fun LayerImagePreview(
         Image(
             bitmap = decoded.asImageBitmap(),
             contentDescription = "Visualizer image layer",
-            contentScale = ContentScale.Fit,
+            contentScale = if (fitMode == "CROP_TO_FIT") ContentScale.Crop else ContentScale.Fit,
             modifier = modifier.graphicsLayer {
                 alpha = opacity
                 translationX = (x - 0.5f) * size.width
