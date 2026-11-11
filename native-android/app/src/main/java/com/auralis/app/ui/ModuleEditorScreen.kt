@@ -115,6 +115,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     val compositionWidth = (values["$compositionSettingsKey.resolutionWidth"] ?: "1920").toIntOrNull()?.coerceIn(1,8192) ?: 1920
     val compositionHeight = (values["$compositionSettingsKey.resolutionHeight"] ?: "1080").toIntOrNull()?.coerceIn(1,8192) ?: 1080
     val compositionAspectRatio = compositionWidth.toFloat() / compositionHeight.coerceAtLeast(1)
+    val compositionFps = (values["$compositionSettingsKey.fpsLimit"] ?: "60").toIntOrNull()?.coerceIn(25, 60) ?: 60
     val module = ModuleCatalog.modules.firstOrNull { it.id == selectedLayer.type }
         ?: ModuleCatalog.modules.first()
     LaunchedEffect(context) {
@@ -143,6 +144,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
 
     var exportResolution by remember { mutableStateOf("1080p") }
     var exportFps by remember { mutableIntStateOf(30) }
+    var exportUseCompositionFps by remember { mutableStateOf(false) }
     var exportProgress by remember { mutableFloatStateOf(0f) }
     var exportStatus by remember { mutableStateOf("READY TO EXPORT") }
     var isExporting by remember { mutableStateOf(false) }
@@ -197,7 +199,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                         config = VideoExportConfig(
                             width = dimensions.first,
                             height = dimensions.second,
-                            fps = exportFps,
+                            fps = if (exportUseCompositionFps) compositionFps else exportFps,
                             includeAudio = true,
                             visualizerLayers = currentLayerSettings
                         )
@@ -767,6 +769,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                                 if (it == "COMPOSITION") previewAspectRatio = "COMPOSITION"
                             },
                             fps = exportFps,
+                            useCompositionFps = exportUseCompositionFps,
+                            onUseCompositionFps = { exportUseCompositionFps = it },
                             onFpsChange = { exportFps = it },
                             progress = exportProgress,
                             status = exportStatus,
@@ -1629,6 +1633,8 @@ private fun ExportPanel(
     resolution: String,
     onResolutionChange: (String) -> Unit,
     fps: Int,
+    useCompositionFps: Boolean,
+    onUseCompositionFps: (Boolean) -> Unit,
     onFpsChange: (Int) -> Unit,
     progress: Float,
     status: String,
@@ -1679,9 +1685,15 @@ private fun ExportPanel(
             )
             ExportChoiceRow(
                 title = "FRAME RATE",
-                options = listOf("25", "30", "50", "60"),
-                selected = fps.toString(),
-                onSelect = { onFpsChange(it.toInt()) },
+                options = listOf("25", "30", "50", "60", "COMPOSITION"),
+                selected = if (useCompositionFps) "COMPOSITION" else fps.toString(),
+                onSelect = {
+                    if (it == "COMPOSITION") onUseCompositionFps(true)
+                    else {
+                        onUseCompositionFps(false)
+                        onFpsChange(it.toInt())
+                    }
+                },
                 suffix = " FPS"
             )
 
