@@ -433,6 +433,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 particleSpeed = number("speed", 1f).coerceIn(0f, 10f),
                 particleSize = number("startSize", 3f).coerceIn(0f, 64f),
                 particleSpread = number("amountX", 0.8f).coerceIn(0f, 10f),
+                particleSpreadY = number("amountY", 0.8f).coerceIn(0f, 10f),
                 particleMirrorX = flag("mirrorX") || globalMirrorX,
                 particleMirrorY = flag("mirrorY") || globalMirrorY,
                 particleRotation = number("rotation", 0f),
