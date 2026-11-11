@@ -257,6 +257,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         if (config.particlesEnabled && config.particleCount > 0) {
             val points = particleBuffer ?: return
             points.clear()
+            var renderedParticleCount = 0
             val now = System.nanoTime() / 1_000_000_000.0
             val energy = data.average().toFloat().coerceIn(0f, 1f)
             val particlePositionSignal = measureSignal(config.particlePositionMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
@@ -281,12 +282,18 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val x = (localX * particleCos - localY * particleSin + particleXOffset).coerceIn(-1.2f, 1.2f)
                 val y = (localX * particleSin + localY * particleCos + particleYOffset).coerceIn(-1.2f, 1.2f)
                 val alpha = (config.particleOpacity * (0.30f + energy * 0.70f) * (0.45f + ((seed * 0.31f) % 0.55f))).coerceIn(0f, 1f)
-                points.put(x)
-                points.put(y)
-                points.put(((config.particleColor shr 16) and 0xFF).toFloat() / 255f)
-                points.put(((config.particleColor shr 8) and 0xFF).toFloat() / 255f)
-                points.put((config.particleColor and 0xFF).toFloat() / 255f)
-                points.put(alpha * (((config.particleColor shr 24) and 0xFF).toFloat() / 255f))
+                val red = ((config.particleColor shr 16) and 0xFF).toFloat() / 255f
+                val green = ((config.particleColor shr 8) and 0xFF).toFloat() / 255f
+                val blue = (config.particleColor and 0xFF).toFloat() / 255f
+                val finalAlpha = alpha * (((config.particleColor shr 24) and 0xFF).toFloat() / 255f)
+                fun appendParticle(px: Float, py: Float) {
+                    points.put(px); points.put(py); points.put(red); points.put(green); points.put(blue); points.put(finalAlpha)
+                    renderedParticleCount++
+                }
+                appendParticle(x, y)
+                if (config.particleMirrorX) appendParticle(-x, y)
+                if (config.particleMirrorY) appendParticle(x, -y)
+                if (config.particleMirrorX && config.particleMirrorY) appendParticle(-x, -y)
             }
             points.position(0)
             GLES20.glUniform1f(roundPointHandle, 1f)
@@ -296,7 +303,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 24, points)
             points.position(2)
             GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, points)
-            GLES20.glDrawArrays(GLES20.GL_POINTS, 0, config.particleCount)
+            GLES20.glDrawArrays(GLES20.GL_POINTS, 0, renderedParticleCount)
         }
         }
         GLES20.glDisableVertexAttribArray(positionHandle)
