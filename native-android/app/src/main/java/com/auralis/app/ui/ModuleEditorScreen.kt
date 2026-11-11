@@ -540,6 +540,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                         EditorTab.ELEMENTS -> LayersPanel(
                             layers = layers,
                             selectedLayerId = selectedLayerId,
+                            values = values,
                             onSelect = { layer ->
                                 selectedLayerId = layer.id
                                 selectedModuleId = layer.type
@@ -555,6 +556,24 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                                     selectedLayerId = nextId
                                     selectedModuleId = type
                                     selectedTab = EditorTab.STUDIO
+                                }
+                            },
+                            onMove = { layerId, direction ->
+                                val index = layers.indexOfFirst { it.id == layerId }
+                                val target = index + direction
+                                if (index >= 0 && target in layers.indices) {
+                                    val reordered = layers.toMutableList()
+                                    val item = reordered.removeAt(index)
+                                    reordered.add(target, item)
+                                    layers = reordered
+                                }
+                            },
+                            onToggleVisibility = { layerId ->
+                                val layer = layers.firstOrNull { it.id == layerId }
+                                if (layer != null) {
+                                    val key = if (layer.id == 1 && layer.type == "BARS") "BARS" else "layer_${layer.id}_${layer.type}"
+                                    val visible = values["$key.visible"]?.toBooleanStrictOrNull() ?: true
+                                    store.update(key, SettingSpec("visible", "Visible", SettingKind.CHECKBOX, defaultValue = "true"), (!visible).toString())
                                 }
                             },
                             onRemove = { layerId ->
@@ -1112,8 +1131,11 @@ private fun StudioPropertiesPanel(
 private fun LayersPanel(
     layers: List<SavedLayerRecord>,
     selectedLayerId: Int,
+    values: Map<String, String>,
     onSelect: (SavedLayerRecord) -> Unit,
     onAdd: (String) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onToggleVisibility: (Int) -> Unit,
     onRemove: (Int) -> Unit
 ) {
     var addMenuExpanded by remember { mutableStateOf(false) }
@@ -1183,7 +1205,13 @@ private fun LayersPanel(
                             Text(layer.name, color = if (active) EditorAccent else EditorText, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(spec?.title ?: layer.type, color = EditorMuted, fontSize = 8.sp, letterSpacing = 0.4.sp)
                         }
-                        if (active) Text("SELECTED", color = EditorAccent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        val layerKey = if (layer.id == 1 && layer.type == "BARS") "BARS" else "layer_${layer.id}_${layer.type}"
+                        val visible = (values["$layerKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+                        TextButton(onClick = { onToggleVisibility(layer.id) }, contentPadding = PaddingValues(horizontal = 3.dp, vertical = 0.dp)) {
+                            Text(if (visible) "SHOW" else "HIDDEN", color = if (visible) EditorSuccess else EditorMuted, fontSize = 7.sp)
+                        }
+                        TextButton(onClick = { onMove(layer.id, -1) }, enabled = layers.indexOf(layer) > 0, contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)) { Text("↑", color = EditorText) }
+                        TextButton(onClick = { onMove(layer.id, 1) }, enabled = layers.indexOf(layer) < layers.lastIndex, contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)) { Text("↓", color = EditorText) }
                         if (layers.size > 1) {
                             TextButton(
                                 onClick = { onRemove(layer.id) },
