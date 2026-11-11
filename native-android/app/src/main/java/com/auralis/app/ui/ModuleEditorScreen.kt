@@ -15,8 +15,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.ui.input.pointer.horizontalDrag
+import androidx.compose.ui.input.pointer.waitForUpOrCancellation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -55,6 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -1336,7 +1341,7 @@ private fun LayersPanel(
                         Icon(Icons.Outlined.Layers, null, tint = if (active) EditorAccent else EditorMuted, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(layer.name, color = if (active) EditorAccent else EditorText, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(layer.name.uppercase(), color = if (active) EditorAccent else EditorText, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(spec?.title ?: layer.type, color = EditorMuted, fontSize = 8.sp, letterSpacing = 0.4.sp)
                         }
                         val layerKey = if (layer.id == 1 && layer.type == "BARS") "BARS" else "layer_${layer.id}_${layer.type}"
@@ -1718,7 +1723,7 @@ private fun SettingControl(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        spec.label,
+                        spec.label.uppercase(),
                         modifier = Modifier.weight(1f),
                         color = EditorText,
                         fontSize = 10.sp
@@ -1758,7 +1763,7 @@ private fun SettingControl(
 
             SettingKind.DROPDOWN -> {
                 var expanded by remember(spec.key) { mutableStateOf(false) }
-                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                Text(spec.label.uppercase(), color = EditorText, fontSize = 10.sp)
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = it }
@@ -1783,7 +1788,7 @@ private fun SettingControl(
                     ) {
                         spec.options.forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option, fontSize = 11.sp) },
+                                text = { Text(option.uppercase(), fontSize = 11.sp) },
                                 onClick = {
                                     onValueChange(option)
                                     expanded = false
@@ -1885,6 +1890,7 @@ private fun SettingControl(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     textStyle = MaterialTheme.typography.bodySmall
                 )
             }
@@ -1915,32 +1921,41 @@ private fun ThinValueSlider(
 ) {
     val minValue = valueRange.start
     val maxValue = valueRange.endInclusive
+    val safeRange = (maxValue - minValue).takeIf { it > 0f } ?: 1f
     val currentValue = value.coerceIn(minValue, maxValue)
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val insetPx = with(density) { 5.dp.toPx() }
+    val insetPx = with(density) { 6.dp.toPx() }
 
     fun updateFromX(x: Float, width: Int) {
-        val usableWidth = width.toFloat() - insetPx * 2f
-        if (usableWidth <= 0f || maxValue <= minValue) return
+        val usableWidth = (width.toFloat() - insetPx * 2f).coerceAtLeast(1f)
         val fraction = ((x - insetPx) / usableWidth).coerceIn(0f, 1f)
-        onValueChange(minValue + (maxValue - minValue) * fraction)
+        val next = (minValue + safeRange * fraction).coerceIn(minValue, maxValue)
+        onValueChange(next)
     }
 
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .height(27.dp)
+            .height(36.dp)
             .pointerInput(enabled, minValue, maxValue, insetPx) {
-                if (enabled) detectTapGestures { updateFromX(it.x, size.width) }
-            }
-            .pointerInput(enabled, minValue, maxValue, insetPx) {
-                if (enabled) detectDragGestures(
-                    onDragStart = { updateFromX(it.x, size.width) },
-                    onDrag = { change, _ ->
-                        updateFromX(change.position.x, size.width)
+                if (!enabled) return@pointerInput
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    updateFromX(down.position.x, size.width)
+                    val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, _ ->
                         change.consume()
+                        updateFromX(change.position.x, size.width)
                     }
-                )
+                    if (drag != null) {
+                        horizontalDrag(drag.id) { change ->
+                            updateFromX(change.position.x, size.width)
+                            change.consume()
+                        }
+                    } else {
+                        val up = waitForUpOrCancellation()
+                        if (up != null) updateFromX(up.position.x, size.width)
+                    }
+                }
             }
     ) {
         val inset = 5.dp.toPx()
@@ -1965,7 +1980,7 @@ private fun ThinValueSlider(
         )
         drawCircle(
             color = if (enabled) EditorAccent else EditorMuted,
-            radius = 4.dp.toPx(),
+            radius = 5.dp.toPx(),
             center = Offset(thumbX, centerY)
         )
     }
