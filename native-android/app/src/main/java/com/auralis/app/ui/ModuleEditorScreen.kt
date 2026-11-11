@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -34,12 +35,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -464,7 +468,10 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 hasAudio = selectedAudioUri != null,
                 audioSessionActive = audioSessionId > 0,
                 previewSurface = { previewSurface = it },
-                layerSettings = liveLayerSettings
+                layerSettings = liveLayerSettings,
+                layers = layers,
+                values = values,
+                trackName = selectedAudioName
             )
 
             Column(
@@ -663,7 +670,10 @@ private fun PreviewPane(
     hasAudio: Boolean,
     audioSessionActive: Boolean,
     previewSurface: (VisualizerSurface) -> Unit,
-    layerSettings: List<VisualizerSettings>
+    layerSettings: List<VisualizerSettings>,
+    layers: List<SavedLayerRecord>,
+    values: Map<String, String>,
+    trackName: String
 ) {
     Column(
         modifier = modifier
@@ -732,6 +742,13 @@ private fun PreviewPane(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+
+                layers.forEach { layer ->
+                    when (layer.type) {
+                        "TEXT" -> TextLayerOverlay(layer, values, trackName)
+                        "IMAGE" -> ImageLayerOverlay(layer, values)
+                    }
+                }
 
                 if (!hasAudio) {
                     Column(
