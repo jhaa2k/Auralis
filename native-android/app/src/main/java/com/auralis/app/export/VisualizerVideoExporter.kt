@@ -306,7 +306,7 @@ object VisualizerVideoExporter {
                                     ((((style.colorFrom shr shift) and 255).toFloat() +
                                         (((style.colorTo shr shift) and 255).toFloat()-((style.colorFrom shr shift) and 255).toFloat())*colorProgress)/255f)
                                 val sr=segmentChannel(16); val sg=segmentChannel(8); val sb=segmentChannel(0)
-                                val alpha=config.opacity*segmentChannel(24)
+                                val alpha=config.opacity*config.compositionAlpha*segmentChannel(24)
                                 if (config.glow > 0f) quad(left-.008f,bottom-.008f,right+.008f,top+.008f,sr,sg,sb,alpha*config.glow*.2f,config)
                                 if (config.motionBlurAmount > 0f) quad(left-.006f,bottom,right-.006f,top,sr,sg,sb,alpha*config.motionBlurAmount*.28f,config)
                                 val flip = style.flipOther && i%2==1
@@ -373,7 +373,7 @@ object VisualizerVideoExporter {
                         val fadeWindow = (config.particleFadeInOutTime / life).coerceIn(0f, .5f)
                         val fadeIn = if (fadeWindow <= 0f) 1f else (phase / fadeWindow).coerceIn(0f, 1f)
                         val fadeOut = if (fadeWindow <= 0f) 1f else ((1f - phase) / fadeWindow).coerceIn(0f, 1f)
-                        val alphaFactor = config.particleOpacity * (.3f + energy * .7f) * fadeIn * fadeOut
+                        val alphaFactor = config.particleOpacity * config.compositionAlpha * (.3f + energy * .7f) * fadeIn * fadeOut
                         fun mix(shift: Int) = channel(config.particleColor, shift) +
                             (channel(config.particleColorTo, shift) - channel(config.particleColor, shift)) * phase
                         val red = mix(16); val green = mix(8); val blue = mix(0)
