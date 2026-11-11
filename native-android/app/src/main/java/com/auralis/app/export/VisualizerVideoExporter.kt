@@ -207,9 +207,16 @@ object VisualizerVideoExporter {
                 buf = ByteBuffer.allocateDirect(requiredFloats * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             }
             buf.clear()
-            val background = configs.firstOrNull()?.backgroundColor ?: 0xFF101116L
-            GLES20.glClearColor(((background shr 16) and 255).toFloat()/255f, ((background shr 8) and 255).toFloat()/255f, (background and 255).toFloat()/255f, ((background shr 24) and 255).toFloat()/255f)
-            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            val composition = configs.firstOrNull() ?: VisualizerSettings()
+            val background = composition.backgroundColor
+            val backgroundAlpha = ((background shr 24) and 255).toFloat()/255f * composition.compositionAlpha
+            GLES20.glClearColor(
+                ((background shr 16) and 255).toFloat()/255f,
+                ((background shr 8) and 255).toFloat()/255f,
+                (background and 255).toFloat()/255f,
+                backgroundAlpha
+            )
+            if (composition.clearCanvas) GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val time = System.nanoTime() / 1_000_000_000.0
             fun vertex(x: Float, y: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings, rotationOffset: Float = 0f) {
                 val angle = Math.toRadians((config.rotation + rotationOffset).toDouble())
