@@ -24,6 +24,7 @@ import com.auralis.app.ui.theme.*
 import com.auralis.app.visualizer.AuralisCanvasView
 import com.auralis.app.visualizer.Layer
 import com.auralis.app.visualizer.LayerType
+import com.auralis.app.visualizer.StudioBlendMode
 import com.auralis.app.visualizer.VisualizerProject
 
 private enum class StudioPanelTab(val label: String) {
