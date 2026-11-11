@@ -340,7 +340,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 smoothing = read("smooth", 0.35f).coerceIn(0f, 0.95f),
                 gain = (read("volume", 1f) * read("preamp", 1f)).coerceIn(0.1f, 4f),
                 lowFrequencyFraction = lowFraction,
-                highFrequencyFraction = highFraction
+                highFrequencyFraction = highFraction,
+                measureSource = sourceMode
             )
         }
     }
