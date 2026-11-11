@@ -27,6 +27,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AudioFile
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -256,8 +260,8 @@ fun AuralisApp() {
                 runCatching {
                     VisualizerVideoExporter.export(
                         context = context,
-                        audioUri = sourceUri,
-                        outputUri = outputUri,
+                        audio = sourceUri,
+                        destination = outputUri,
                         config = VideoExportConfig(width = size.first, height = size.second, fps = fps, includeAudio = true)
                     ) { progress, message ->
                         exportProgress = progress
@@ -781,27 +785,46 @@ private fun PropertySlider(
     valueLabel: String,
     resetValue: Float = 0.5f
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    val normalized = value.coerceIn(0f, 1f)
+    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = StudioWhite, fontSize = 10.sp)
+            Text(label, color = StudioWhite, fontSize = 9.sp)
             Spacer(Modifier.weight(1f))
             Text(valueLabel, color = StudioAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
-        Slider(
-            value = value.coerceIn(0f, 1f),
-            onValueChange = onValueChange,
-            valueRange = 0f..1f,
+        Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(26.dp)
+                .height(18.dp)
                 .pointerInput(resetValue) {
-                    detectTapGestures(onDoubleTap = { onValueChange(resetValue.coerceIn(0f, 1f)) })
+                    detectTapGestures(
+                        onTap = { point ->
+                            val next = (point.x / size.width).coerceIn(0f, 1f)
+                            onValueChange(next)
+                        },
+                        onDoubleTap = { onValueChange(resetValue.coerceIn(0f, 1f)) }
+                    )
                 }
-        )
+                .pointerInput(Unit) {
+                    detectDragGestures { change, _ ->
+                        change.consume()
+                        onValueChange((change.position.x / size.width).coerceIn(0f, 1f))
+                    }
+                }
+        ) {
+            val cy = size.height / 2f
+            val left = 6.dp.toPx()
+            val right = size.width - 6.dp.toPx()
+            val thumbX = left + (right - left) * normalized
+            drawLine(StudioLine, Offset(left, cy), Offset(right, cy), strokeWidth = 3.dp.toPx())
+            drawLine(StudioAccent.copy(alpha = 0.72f), Offset(left, cy), Offset(thumbX, cy), strokeWidth = 3.dp.toPx())
+            drawCircle(StudioBlack, 6.dp.toPx(), Offset(thumbX, cy))
+            drawCircle(StudioAccent, 5.3.dp.toPx(), Offset(thumbX, cy), style = Stroke(width = 1.8.dp.toPx()))
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(startLabel, color = StudioMuted, fontSize = 7.sp)
             Spacer(Modifier.weight(1f))
-            Text("DOUBLE-TAP TO RESET", color = StudioMuted.copy(alpha = 0.65f), fontSize = 6.sp)
+            Text("DOUBLE-TAP TO RESET", color = StudioMuted.copy(alpha = 0.55f), fontSize = 6.sp)
             Spacer(Modifier.weight(1f))
             Text(endLabel, color = StudioMuted, fontSize = 7.sp)
         }
