@@ -264,10 +264,10 @@ object VisualizerVideoExporter {
                     "Line", "HorizontalLine" -> quad(left,(bottom+top)*.5f-.0035f,right,(bottom+top)*.5f+.0035f,red,green,blue,alpha,config,rotationOffset)
                     "VerticalLine" -> quad((left+right)*.5f-.0035f,bottom,(left+right)*.5f+.0035f,top,red,green,blue,alpha,config,rotationOffset)
                     "Circle", "Oval" -> polygon(left,bottom,right,top,20,red,green,blue,alpha,config,rotationOffset=rotationOffset,flipVertical=flipVertical)
-                    "Triangle" -> polygon(left,bottom,right,top,3,red,green,blue,alpha,config,rotationOffset=rotationOffset)
-                    "Star", "Heart" -> polygon(left,bottom,right,top,10,red,green,blue,alpha,config,star=true,rotationOffset=rotationOffset,flipVertical=flipVertical)
-                    "Pentagon" -> polygon(left,bottom,right,top,5,red,green,blue,alpha,config,rotationOffset=rotationOffset)
-                    "Hexagon", "SidedPolygon" -> polygon(left,bottom,right,top,6,red,green,blue,alpha,config,rotationOffset=rotationOffset)
+                    "Triangle" -> polygon(left,bottom,right,top,3,red,green,blue,alpha,config,rotationOffset=rotationOffset,flipVertical=flipVertical)
+                    "Star" -> polygon(left,bottom,right,top,10,red,green,blue,alpha,config,star=true,rotationOffset=rotationOffset,flipVertical=flipVertical)
+                    "Pentagon" -> polygon(left,bottom,right,top,5,red,green,blue,alpha,config,rotationOffset=rotationOffset,flipVertical=flipVertical)
+                    "Hexagon", "SidedPolygon" -> polygon(left,bottom,right,top,6,red,green,blue,alpha,config,rotationOffset=rotationOffset,flipVertical=flipVertical)
                     "Square" -> {
                         val side = minOf(right-left,top-bottom); val cx=(left+right)*.5f
                         quad(cx-side*.5f,bottom,cx+side*.5f,bottom+side,red,green,blue,alpha,config,rotationOffset)
