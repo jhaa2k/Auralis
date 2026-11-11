@@ -231,7 +231,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val red = channel(16)
             val green = channel(8)
             val blue = channel(0)
-            val alpha = config.opacity * channel(24)
+            val alpha = config.opacity * channel(24) * config.compositionAlpha
             fun appendVertex(x: Float, y: Float, r: Float, g: Float, b: Float, a: Float) {
                 val angle = Math.toRadians(effectiveRotation.toDouble())
                 val cosine = cos(angle).toFloat()
@@ -489,7 +489,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val fadeIn = if (fadeWindow <= 0f) 1f else (phase / fadeWindow).coerceIn(0f, 1f)
                 val fadeOut = if (fadeWindow <= 0f) 1f else ((1f - phase) / fadeWindow).coerceIn(0f, 1f)
                 val energyAlpha = 0.30f + energy * 0.70f
-                val alpha = config.particleOpacity * energyAlpha * fadeIn * fadeOut
+                val alpha = config.particleOpacity * config.compositionAlpha * energyAlpha * fadeIn * fadeOut
                 val t = phase.coerceIn(0f, 1f)
                 fun lerpChannel(shift: Int) =
                     colorChannel(config.particleColor, shift) +
