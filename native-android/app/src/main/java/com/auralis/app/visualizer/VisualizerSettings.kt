@@ -18,6 +18,8 @@ data class BarSegmentStyle(
 
 data class VisualizerSettings(
     val backgroundColor: Long = 0xFF101116,
+    val compositionAlpha: Float = 1f,
+    val clearCanvas: Boolean = true,
     val barCount: Int = 64,
     val sensitivity: Float = 1f,
     val smoothing: Float = 0.35f,
@@ -94,6 +96,7 @@ data class VisualizerSettings(
     val segmentGap: Float = 0.18f
 ) {
     fun sanitized() = copy(
+        compositionAlpha = compositionAlpha.coerceIn(0f, 1f),
         barCount = barCount.coerceIn(16, 128),
         sensitivity = sensitivity.coerceIn(0.1f, 4f),
         smoothing = smoothing.coerceIn(0f, 0.95f),
