@@ -10,14 +10,25 @@ import kotlin.math.pow
  * Android requires RECORD_AUDIO permission for the Visualizer API.
  */
 class VisualizerCapture(
-    private val smoothing: Float = 0.35f,
-    private val gain: Float = 1f,
-    private val lowFrequencyFraction: Float = 0f,
-    private val highFrequencyFraction: Float = 1f,
+    smoothing: Float = 0.35f,
+    gain: Float = 1f,
+    lowFrequencyFraction: Float = 0f,
+    highFrequencyFraction: Float = 1f,
     private val onSpectrum: (FloatArray) -> Unit
 ) {
+    @Volatile private var smoothing = smoothing
+    @Volatile private var gain = gain
+    @Volatile private var lowFrequencyFraction = lowFrequencyFraction
+    @Volatile private var highFrequencyFraction = highFrequencyFraction
     private var visualizer: Visualizer? = null
     private var smoothed = FloatArray(128)
+
+    fun configure(smoothing: Float, gain: Float, lowFrequencyFraction: Float, highFrequencyFraction: Float) {
+        this.smoothing = smoothing.coerceIn(0f, 0.95f)
+        this.gain = gain.coerceIn(0.1f, 4f)
+        this.lowFrequencyFraction = lowFrequencyFraction.coerceIn(0f, 0.95f)
+        this.highFrequencyFraction = highFrequencyFraction.coerceIn(this.lowFrequencyFraction + 0.05f, 1f)
+    }
 
     fun start(audioSessionId: Int) {
         stop()
