@@ -234,6 +234,20 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     if (segmentTop > segmentBottom) appendQuad(x0, -segmentTop, x1, -segmentBottom, alpha)
                 }
             }
+            if (config.mirrorX) {
+                for (segment in 0 until segmentCount) {
+                    val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
+                    val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
+                    if (segmentTop > segmentBottom) appendQuad(-x1, segmentBottom, -x0, segmentTop, alpha)
+                }
+            }
+            if (config.mirror && config.mirrorX) {
+                for (segment in 0 until segmentCount) {
+                    val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
+                    val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
+                    if (segmentTop > segmentBottom) appendQuad(-x1, -segmentTop, -x0, -segmentBottom, alpha)
+                }
+            }
         }
         val buffer = vertexBuffer ?: return
         buffer.clear()
