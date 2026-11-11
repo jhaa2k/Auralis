@@ -944,97 +944,97 @@ private fun StudioPropertiesPanel(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ElementsPanel(
-    selectedModuleId: String,
-    onSelect: (String) -> Unit
+private fun LayersPanel(
+    layers: List<SavedLayerRecord>,
+    selectedLayerId: Int,
+    onSelect: (SavedLayerRecord) -> Unit,
+    onAdd: (String) -> Unit,
+    onRemove: (Int) -> Unit
 ) {
+    var addMenuExpanded by remember { mutableStateOf(false) }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(EditorBackground)
+        modifier = Modifier.fillMaxSize().background(EditorBackground)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 13.dp, vertical = 7.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "ELEMENT LIBRARY",
-                color = EditorText,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp
-            )
-            Text(
-                "Choose an element to open its full inspector.",
-                color = EditorMuted,
-                fontSize = 9.sp
-            )
+            Column(Modifier.weight(1f)) {
+                Text("LAYERS", color = EditorText, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                Text("${layers.size} COMPOSITION LAYERS", color = EditorMuted, fontSize = 8.sp)
+            }
+            Box {
+                OutlinedButton(
+                    onClick = { addMenuExpanded = true },
+                    contentPadding = PaddingValues(horizontal = 11.dp, vertical = 5.dp),
+                    border = BorderStroke(1.dp, EditorAccent),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorAccent)
+                ) {
+                    Icon(Icons.Outlined.Layers, null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text("ADD ELEMENT", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+                DropdownMenu(
+                    expanded = addMenuExpanded,
+                    onDismissRequest = { addMenuExpanded = false },
+                    modifier = Modifier.background(EditorPanel)
+                ) {
+                    ModuleCatalog.modules.forEach { item ->
+                        DropdownMenuItem(
+                            text = { Text(item.title, color = EditorText, fontSize = 11.sp) },
+                            onClick = {
+                                addMenuExpanded = false
+                                onAdd(item.id)
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Layers, null, tint = EditorAccent, modifier = Modifier.size(16.dp))
+                            }
+                        )
+                    }
+                }
+            }
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 3.dp, bottom = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            items(ModuleCatalog.modules.chunked(2)) { row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+            items(layers, key = { it.id }) { layer ->
+                val spec = ModuleCatalog.modules.firstOrNull { it.id == layer.type }
+                val active = layer.id == selectedLayerId
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable { onSelect(layer) },
+                    color = if (active) EditorAccent.copy(alpha = 0.10f) else EditorPanel,
+                    shape = RoundedCornerShape(4.dp),
+                    border = BorderStroke(1.dp, if (active) EditorAccent else EditorLine)
                 ) {
-                    row.forEach { item ->
-                        val active = selectedModuleId == item.id
-                        Surface(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(72.dp)
-                                .clickable { onSelect(item.id) },
-                            color = if (active) EditorAccent.copy(alpha = 0.10f) else EditorPanel,
-                            shape = RoundedCornerShape(4.dp),
-                            border = BorderStroke(
-                                1.dp,
-                                if (active) EditorAccent.copy(alpha = 0.8f) else EditorLine
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalArrangement = Arrangement.SpaceBetween
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(58.dp).padding(horizontal = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.Layers, null, tint = if (active) EditorAccent else EditorMuted, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(layer.name, color = if (active) EditorAccent else EditorText, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(spec?.title ?: layer.type, color = EditorMuted, fontSize = 8.sp, letterSpacing = 0.4.sp)
+                        }
+                        if (active) Text("SELECTED", color = EditorAccent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        if (layers.size > 1) {
+                            TextButton(
+                                onClick = { onRemove(layer.id) },
+                                contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)
                             ) {
-                                Text(
-                                    item.title,
-                                    color = if (active) EditorAccent else EditorText,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "${item.groups.size} PROPERTY GROUPS",
-                                        color = EditorMuted,
-                                        fontSize = 7.sp,
-                                        letterSpacing = 0.3.sp,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    if (active) {
-                                        Text("ACTIVE", color = EditorAccent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
+                                Text("REMOVE", color = EditorMuted, fontSize = 7.sp)
                             }
                         }
                     }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }
     }
 }
-
 @Composable
 private fun AudioPanel(
     trackName: String,
