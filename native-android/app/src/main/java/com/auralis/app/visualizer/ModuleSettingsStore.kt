@@ -40,12 +40,26 @@ class ModuleSettingsStore(application: Application) : AndroidViewModel(applicati
 
     fun value(moduleId: String, spec: SettingSpec): String =
         _values.value["$moduleId.${spec.key}"] ?: spec.defaultValue.ifBlank {
-            when (spec.kind) {
-                SettingKind.CHECKBOX -> "false"
-                SettingKind.COLOR -> "#FFFFFFFF"
-                SettingKind.DROPDOWN -> spec.options.firstOrNull().orEmpty()
-                SettingKind.SLIDER, SettingKind.NUMBER -> spec.min.toString()
-                else -> ""
+            when (spec.key) {
+                "visible" -> "true"
+                "positionX", "positionY", "alignmentX", "alignmentY", "pivotX", "pivotY" -> "0.5"
+                "scaleX", "scaleY", "particleScale", "opacity", "opacityStrength", "alpha" -> "1"
+                "rotation", "splitAmount", "blurRadius" -> "0"
+                "barCount" -> "64"
+                "heightScale", "maxHeightScale" -> "1"
+                "barWidth" -> "0.72"
+                "barSpacing" -> "0.18"
+                "countLimit" -> "120"
+                "startSize", "fontSize" -> "30"
+                "speed" -> "1"
+                "amountX", "amountY" -> "0.8"
+                else -> when (spec.kind) {
+                    SettingKind.CHECKBOX -> "false"
+                    SettingKind.COLOR -> "#FFFFFFFF"
+                    SettingKind.DROPDOWN -> spec.options.firstOrNull().orEmpty()
+                    SettingKind.SLIDER, SettingKind.NUMBER -> spec.min.toString()
+                    else -> ""
+                }
             }
         }
 
