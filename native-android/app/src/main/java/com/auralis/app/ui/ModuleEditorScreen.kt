@@ -1742,7 +1742,7 @@ private fun SettingControl(
                 val numeric = value.toFloatOrNull()?.coerceIn(min, max) ?: min
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        spec.label,
+                        spec.label.uppercase(),
                         modifier = Modifier.weight(1f),
                         color = EditorText,
                         fontSize = 10.sp
@@ -1800,7 +1800,7 @@ private fun SettingControl(
             }
 
             SettingKind.COLOR -> {
-                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                Text(spec.label.uppercase(), color = EditorText, fontSize = 10.sp)
                 OutlinedTextField(
                     value = value,
                     onValueChange = { typed ->
@@ -1850,7 +1850,7 @@ private fun SettingControl(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorText),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text(if (value.isBlank()) "CHOOSE IMAGE" else value.substringAfterLast('/').take(42), fontSize = 9.sp)
+                    Text(if (value.isBlank()) "CHOOSE IMAGE" else value.substringAfterLast('/').take(42).uppercase(), fontSize = 9.sp)
                 }
             }
 
@@ -1864,7 +1864,7 @@ private fun SettingControl(
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorText),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text(value.substringAfterLast('/').ifBlank { "CHOOSE FONT" }, fontSize = 9.sp)
+                    Text(value.substringAfterLast('/').ifBlank { "CHOOSE FONT" }.uppercase(), fontSize = 9.sp)
                 }
             }
 
@@ -1880,13 +1880,13 @@ private fun SettingControl(
             }
 
             SettingKind.NUMBER -> {
-                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                Text(spec.label.uppercase(), color = EditorText, fontSize = 10.sp)
                 OutlinedTextField(
                     value = value,
                     onValueChange = { input ->
-                        if (input.isEmpty() || input.toFloatOrNull() != null) {
-                            onValueChange(input)
-                        }
+                        val partialNumber = input.isEmpty() || input == "-" || input == "." || input == "-." ||
+                            input.toFloatOrNull() != null
+                        if (partialNumber) onValueChange(input)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
