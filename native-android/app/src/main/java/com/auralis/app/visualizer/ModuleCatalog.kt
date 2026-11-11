@@ -8,7 +8,7 @@ data class SettingGroup(val title: String, val settings: List<SettingSpec>)
 data class ModuleSpec(val id: String, val title: String, val groups: List<SettingGroup>)
 
 object ModuleCatalog {
-    val blendModes = "Alpha,PreMulAlpha,Screen,Add,AddAlpha,Multiply,Darken,Lighten,ColorDodge,ColorBurn,Overlay,SoftLight,HardLight,Difference,Exclusion,Hue,Saturation,Color,Luminosity".split(",")
+    val blendModes = "Alpha,Add,Screen,Multiply".split(",")
     val anchors = "unset,start,center,end,top,bottom,topLeft,topCenter,topRight,bottomLeft,bottomCenter,bottomRight,centerLeft,centerRight,justify,fill,stretch".split(",")
     val shapes = "None,Circle,SidedPolygon,Line,HorizontalLine,VerticalLine,Rectangle,Square,Triangle,Star,Oval,Pentagon,Hexagon".split(",")
     val imageShapes = "None,Rectangle,Square,Circle,Oval,Triangle,Star,Pentagon,Hexagon".split(",")
@@ -129,13 +129,11 @@ object ModuleCatalog {
         return SettingSpec(key, label, kind, options, min, max, resolvedDefault)
     }
     private fun general() = SettingGroup("General", listOf(
-        s("tag","Tag",SettingKind.TEXT), s("visible","Visible",SettingKind.CHECKBOX,default="true"),
-        s("blendMode","Blend Mode",SettingKind.DROPDOWN,options=blendModes,default="Alpha"),
+        s("visible","Visible",SettingKind.CHECKBOX,default="true"),
         s("positionX","Position X"),s("positionY","Position Y"),
-        s("anchorX","Anchor X",SettingKind.DROPDOWN,options=anchors,default="center"),s("anchorY","Anchor Y",SettingKind.DROPDOWN,options=anchors,default="center"),
-        s("alignmentX","Alignment Position X"),s("alignmentY","Alignment Position Y"),
-        s("uniformScale","Scale Is Uniform",SettingKind.CHECKBOX,default="true"),s("scaleX","Scale X"),s("scaleY","Scale Y"),s("rotation","Rotation",min=-180f,max=180f),s("pivotX","Pivot X"),s("pivotY","Pivot Y"),
-        s("measurePos","Measure Pos",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureScale","Measure Scale",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureRot","Measure Rot",SettingKind.DROPDOWN,options=measures,default="Nothing")
+        s("uniformScale","Scale Is Uniform",SettingKind.CHECKBOX,default="true"),
+        s("scaleX","Scale X"),s("scaleY","Scale Y"),
+        s("rotation","Rotation",min=-180f,max=180f)
     ))
     private fun group(title:String,vararg fields:SettingSpec)=SettingGroup(title,fields.toList())
     val modules: List<ModuleSpec> = listOf(
@@ -150,7 +148,7 @@ object ModuleCatalog {
                     s("heightScale","Height Scale",max=2f), s("minHeightScale","Min Height Scale"),
                     s("maxHeightScale","Max Height Scale"), s("shapePath","Shape Path",SettingKind.DROPDOWN,options=shapes,default="Rectangle"),
                     s("colorBlendOffset","Color Blend Offset"), s("barCount","Bar Count",max=128f,default="64"),
-                    s("barSpacing","Bar Spacing"), s("barWidth","Bar Width")
+                    s("barSpacing","Bar Spacing"), s("barWidth","Bar Width"), s("blendMode","Blend Mode",SettingKind.DROPDOWN,options=blendModes,default="Alpha")
                 )
             ) + (1..3).map { n ->
                 group("Segment $n",
@@ -162,13 +160,13 @@ object ModuleCatalog {
                     s("segment${n}Mirror","Mirror",SettingKind.CHECKBOX), s("segment${n}FlipOther","Flip Every Other",SettingKind.CHECKBOX)
                 )
             } + listOf(
-                group("Behavior",s("softness","Softness"),s("reactionDelay","Reaction Delay"),
+                group("Behavior",s("measurePos","Measure Pos",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureScale","Measure Scale",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureRot","Measure Rot",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("softness","Softness"),s("reactionDelay","Reaction Delay"),
                     s("reactionAccumulatedDelay","Reaction Accumulated Delay"),
                     s("audioProviderIndex","Audio Provider Index",SettingKind.NUMBER,0f,32f),
                     s("audioChannel","Audio Channel",SettingKind.DROPDOWN,options=listOf("Mono","Left","Right","Stereo")))
             )
         ),
-        ModuleSpec("PARTICLES","PARTICLES",listOf(general(),group("Overall Settings",s("color","Color",SettingKind.COLOR,default="#FFFFFFFF"),s("countLimit","Count Limit",max=5000f),s("mirrorX","Mirror X",SettingKind.CHECKBOX),s("mirrorY","Mirror Y",SettingKind.CHECKBOX),s("perspectiveDepth","Perspective Depth"),s("perspectiveFov","Perspective Fov",max=180f),s("spawnArea","Spawn Area",SettingKind.DROPDOWN,options=listOf("Rectangle","Circle","Line","Point")),s("vectorRelative","Vector Relative To Center",SettingKind.CHECKBOX),s("randomVector","Use Random Vector Instead",SettingKind.CHECKBOX),s("vectorAngle","Vector Angle",max=360f),s("vectorAngleZ","Vector Angle Z",max=360f),s("forceField","Force Field",SettingKind.DROPDOWN,options=listOf("None","Gravity","Wind","Vortex","Attractor","Repeller"))),group("Appearance",s("customImage","Custom Image",SettingKind.IMAGE_PICKER),s("particleScale","Particle Scale"),s("trailLength","Trail Length"),s("colorFrom","Color From",SettingKind.COLOR,default="#FFFFFFFF"),s("colorTo","Color To",SettingKind.COLOR,default="#FFFFFFFF"),s("fadeInOut","Fade In And Out Time"),s("velocityAngle","Velocity Angle",SettingKind.CHECKBOX),s("sizeAspectRatio","Size Aspect Ratio"),s("startSize","Start Size"),s("fadeInSize","Fade In Size"),s("endSize","End Size"),s("endSizeRandom","End Size Random"),s("endSizeZFactor","End Size ZFactor"),s("nearCameraFade","Near Camera Fade Out Distance")),group("Behaviour",s("spawnTime","Spawn Time"),s("measureOverallSpeed","Measure Overall Speed",SettingKind.DROPDOWN,options=measures),s("amountX","A X Amount"),s("amountY","B Y Amount"),s("speed","Speed"),s("speedRandom","Speed Random"),s("lifetime","Lifetime",max=120f),s("gravityX","Gravity X",min=-10f,max=10f),s("gravityY","Gravity Y",min=-10f,max=10f)),group("Wave Behaviour",s("sideSineFreq","Side Sine Wave Freq"),s("sideSineFreqRandom","Side Sine Wave Freq Random"),s("sideSineMag","Side Sine Wave Mag"),s("sideSineMagRandom","Side Sine Wave Mag Random")))),
+        ModuleSpec("PARTICLES","PARTICLES",listOf(general(),group("Overall Settings",s("color","Color",SettingKind.COLOR,default="#FFFFFFFF"),s("countLimit","Count Limit",max=5000f),s("mirrorX","Mirror X",SettingKind.CHECKBOX),s("mirrorY","Mirror Y",SettingKind.CHECKBOX),s("perspectiveDepth","Perspective Depth"),s("perspectiveFov","Perspective Fov",max=180f),s("spawnArea","Spawn Area",SettingKind.DROPDOWN,options=listOf("Rectangle","Circle","Line","Point")),s("vectorRelative","Vector Relative To Center",SettingKind.CHECKBOX),s("randomVector","Use Random Vector Instead",SettingKind.CHECKBOX),s("vectorAngle","Vector Angle",max=360f),s("vectorAngleZ","Vector Angle Z",max=360f),s("forceField","Force Field",SettingKind.DROPDOWN,options=listOf("None","Gravity","Wind","Vortex","Attractor","Repeller")),s("blendMode","Blend Mode",SettingKind.DROPDOWN,options=blendModes,default="Alpha")),group("Appearance",s("customImage","Custom Image",SettingKind.IMAGE_PICKER),s("particleScale","Particle Scale"),s("trailLength","Trail Length"),s("colorFrom","Color From",SettingKind.COLOR,default="#FFFFFFFF"),s("colorTo","Color To",SettingKind.COLOR,default="#FFFFFFFF"),s("fadeInOut","Fade In And Out Time"),s("velocityAngle","Velocity Angle",SettingKind.CHECKBOX),s("sizeAspectRatio","Size Aspect Ratio"),s("startSize","Start Size"),s("fadeInSize","Fade In Size"),s("endSize","End Size"),s("endSizeRandom","End Size Random"),s("endSizeZFactor","End Size ZFactor"),s("nearCameraFade","Near Camera Fade Out Distance")),group("Behaviour",s("spawnTime","Spawn Time"),s("measurePos","Measure Pos",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureScale","Measure Scale",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureRot","Measure Rot",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureOverallSpeed","Measure Overall Speed",SettingKind.DROPDOWN,options=measures),s("amountX","A X Amount"),s("amountY","B Y Amount"),s("speed","Speed"),s("speedRandom","Speed Random"),s("lifetime","Lifetime",max=120f),s("gravityX","Gravity X",min=-10f,max=10f),s("gravityY","Gravity Y",min=-10f,max=10f)),group("Wave Behaviour",s("sideSineFreq","Side Sine Wave Freq"),s("sideSineFreqRandom","Side Sine Wave Freq Random"),s("sideSineMag","Side Sine Wave Mag"),s("sideSineMagRandom","Side Sine Wave Mag Random")))),
         ModuleSpec("AUDIOPROVIDER","AUDIOPROVIDER",listOf(group("General",s("visible","Visible",SettingKind.CHECKBOX,default="true"),s("audioSource","Audio Source",SettingKind.DROPDOWN,options=listOf("Player Output"),default="Player Output"),s("volume","Volume"),s("balance","Balance",min=-1f,max=1f),s("preamp","Preamp",max=10f),s("measureSource","Measure Source",SettingKind.DROPDOWN,options=listOf("Bass","Mid","Treble","Volume","Peak"))),group("Sync & Offset",s("audioOffset","Audio Offset (ms)",min=-5000f,max=5000f),s("bpmSync","BPM Sync",SettingKind.NUMBER,1f,300f),s("beatOffset","Beat Offset",min=-10f,max=10f)))),
         ModuleSpec("BLUREFFECT","BLUR EFFECT",listOf(general(),group("Appearance",s("color","Color",SettingKind.COLOR,default="#FFFFFFFF"),s("showSharp","Show Unblurred Content",SettingKind.CHECKBOX,default="true"),s("showSharpUnder","Show Unblurred Content Under",SettingKind.CHECKBOX,default="true")),group("Blur Settings",s("blurRadius","Blur Radius",max=100f),s("blurMultiplier","Blur Multiplier",max=10f)))),
         ModuleSpec("RGBSPLITEFFECT","RGB SPLIT EFFECT",listOf(general(),group("Effect Settings",s("splitAmount","Split Amount"),s("angle","Angle / Direction",max=360f),s("glitchOnBeat","Enable Glitch on Beat",SettingKind.CHECKBOX),s("glitchDuration","Glitch Duration"),s("redOffset","Red Channel Offset"),s("greenOffset","Green Channel Offset"),s("blueOffset","Blue Channel Offset")))),
