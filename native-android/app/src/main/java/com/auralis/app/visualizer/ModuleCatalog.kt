@@ -10,7 +10,7 @@ data class ModuleSpec(val id: String, val title: String, val groups: List<Settin
 object ModuleCatalog {
     val blendModes = "Alpha,PreMulAlpha,Screen,Add,AddAlpha,Multiply,Darken,Lighten,ColorDodge,ColorBurn,Overlay,SoftLight,HardLight,Difference,Exclusion,Hue,Saturation,Color,Luminosity".split(",")
     val anchors = "unset,start,center,end,top,bottom,topLeft,topCenter,topRight,bottomLeft,bottomCenter,bottomRight,centerLeft,centerRight,justify,fill,stretch".split(",")
-    val shapes = "None,Circle,SidedPolygon,Line,HorizontalLine,VerticalLine,Rectangle,Square,Triangle,Star,Heart,WaveformPath,CustomPath,Oval,Capsule,Pentagon,Hexagon".split(",")
+    val shapes = "None,Circle,SidedPolygon,Line,HorizontalLine,VerticalLine,Rectangle,Square,Triangle,Star,Oval,Pentagon,Hexagon".split(",")
     val measures = "Nothing,Beat,TotalTime,TotalTimeBackward,TotalTimeWhenPlaying,TotalTimeAndBeat,TrackPosition,BeatRandomShake,BeatCamShakeRotMore,BeatCamShakeRotLess,ConstantShakeRotMore,ConstantShakeRotLess,BeatTriggerAnim,BeatCamShakeOnly,BeatPulseScale,BeatFlashColor,BeatGlowIntensity,BeatHorizontalStretch,BeatVerticalBounce,ConstantSlowRotate,ConstantOrbitMove,ConstantLinearScroll,TrackProgressPercentage,TrackRemainingTime,TrackIntroOutroTrigger,VolumeLevelResponsive,PitchFrequencyResponsive".split(",")
     val fullBlend = blendModes
     private fun defaultRange(key: String): Pair<Float, Float> = when (key) {
