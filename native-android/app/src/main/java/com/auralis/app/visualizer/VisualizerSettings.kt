@@ -35,6 +35,7 @@ data class VisualizerSettings(
     val rgbSplitAmount: Float = 0f,
     val barWidth: Float = 0.72f,
     val barHeight: Float = 1f,
+    val barMinHeight: Float = 0f,
     val flipInput: Boolean = false,
     val barColorFrom: Long = 0xFFFFFFFF,
     val barColorTo: Long = 0xFF00FFFF,
@@ -68,6 +69,7 @@ data class VisualizerSettings(
         rgbSplitAmount = rgbSplitAmount.coerceIn(0f, 1f),
         barWidth = barWidth.coerceIn(0.15f, 1f),
         barHeight = barHeight.coerceIn(0.1f, 2f),
+        barMinHeight = barMinHeight.coerceIn(0f, 1f),
         segmentCount = segmentCount.coerceIn(1, 32),
         segmentGap = segmentGap.coerceIn(0f, 0.45f)
     )
