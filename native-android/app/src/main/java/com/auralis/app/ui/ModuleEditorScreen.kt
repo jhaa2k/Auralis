@@ -290,6 +290,26 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         )
     }
 
+    LaunchedEffect(values, layers) {
+        val provider = layers.firstOrNull { it.type == "AUDIOPROVIDER" }
+        if (provider == null) {
+            capture.configure(0.35f, 1f, 0f, 1f)
+        } else {
+            val key = "layer_${provider.id}_${provider.type}"
+            fun read(name: String, fallback: Float) = (values["$key.$name"] ?: values["AUDIOPROVIDER.$name"])?.toFloatOrNull() ?: fallback
+            val lowHz = read("lowerHz", 20f).coerceIn(20f, 19000f)
+            val highHz = read("higherHz", 18000f).coerceIn(lowHz + 1f, 20000f)
+            val frequencyRange = kotlin.math.ln(1000f)
+            val lowFraction = (kotlin.math.ln(lowHz / 20f) / frequencyRange).coerceIn(0f, 0.95f)
+            val highFraction = (kotlin.math.ln(highHz / 20f) / frequencyRange).coerceIn(lowFraction + 0.05f, 1f)
+            capture.configure(
+                smoothing = read("smooth", 0.35f).coerceIn(0f, 0.95f),
+                gain = (read("volume", 1f) * read("preamp", 1f)).coerceIn(0.1f, 4f),
+                lowFrequencyFraction = lowFraction,
+                highFrequencyFraction = highFraction
+            )
+        }
+    }
     LaunchedEffect(audioSessionId, hasAudioPermission) {
         capture.stop()
         if (hasAudioPermission && audioSessionId > 0) {
