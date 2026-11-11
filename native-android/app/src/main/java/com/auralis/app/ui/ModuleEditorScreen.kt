@@ -2018,7 +2018,7 @@ private fun ExportChoiceRow(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Text(
-                            option + suffix,
+                            (option + suffix).uppercase(),
                             color = if (active) EditorAccent else EditorText,
                             fontSize = 8.sp,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
