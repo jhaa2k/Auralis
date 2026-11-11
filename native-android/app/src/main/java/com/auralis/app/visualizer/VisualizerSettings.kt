@@ -60,6 +60,9 @@ data class VisualizerSettings(
     val particleFadeInOutTime: Float = 0.1f,
     val particleEndSize: Float = 4f,
     val particleFadeInSize: Float = 0f,
+    val particleEndSizeRandom: Float = 0f,
+    val particleSizeAspectRatio: Float = 1f,
+    val particleVelocityAngle: Boolean = true,
     val particleTrailLength: Float = 0f,
     val segmentCount: Int = 1,
     val segmentGap: Float = 0.18f
@@ -96,6 +99,8 @@ data class VisualizerSettings(
         particleFadeInOutTime = particleFadeInOutTime.coerceIn(0f, 10f),
         particleEndSize = particleEndSize.coerceIn(0f, 64f),
         particleFadeInSize = particleFadeInSize.coerceIn(0f, 64f),
+        particleEndSizeRandom = particleEndSizeRandom.coerceIn(0f, 100f),
+        particleSizeAspectRatio = particleSizeAspectRatio.coerceIn(0.1f, 5f),
         particleTrailLength = particleTrailLength.coerceIn(0f, 50f),
         particleMeasureAmount = particleMeasureAmount.coerceIn(0f, 1f),
         rgbSplitAmount = rgbSplitAmount.coerceIn(0f, 1f),
