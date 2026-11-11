@@ -1,5 +1,21 @@
 package com.auralis.app.visualizer
 
+data class BarSegmentStyle(
+    val enabled: Boolean = true,
+    val shape: String = "Rectangle",
+    val colorFrom: Long = 0xFFFFFFFF,
+    val colorTo: Long = 0xFF00FFFF,
+    val fixedHeight: Float = 0f,
+    val heightMultiplier: Float = 1f,
+    val mirror: Boolean = false,
+    val flipOther: Boolean = false
+) {
+    fun sanitized() = copy(
+        fixedHeight = fixedHeight.coerceIn(0f, 4f),
+        heightMultiplier = heightMultiplier.coerceIn(0f, 5f)
+    )
+}
+
 data class VisualizerSettings(
     val backgroundColor: Long = 0xFF101116,
     val barCount: Int = 64,
@@ -73,6 +89,7 @@ data class VisualizerSettings(
     val particleVelocityAngle: Boolean = true,
     val particleTrailLength: Float = 0f,
     val segmentCount: Int = 1,
+    val segmentStyles: List<BarSegmentStyle> = listOf(BarSegmentStyle()),
     val segmentGap: Float = 0.18f
 ) {
     fun sanitized() = copy(
@@ -124,6 +141,7 @@ data class VisualizerSettings(
         barHeight = barHeight.coerceIn(0.1f, 2f),
         barMinHeight = barMinHeight.coerceIn(0f, 1f),
         segmentCount = segmentCount.coerceIn(1, 32),
+        segmentStyles = segmentStyles.take(3).map { it.sanitized() },
         segmentGap = segmentGap.coerceIn(0f, 0.45f)
     )
 }
