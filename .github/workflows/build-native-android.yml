@@ -28,6 +28,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Build validation for the current native editor module architecture.
       # Use the SDK command-line tools already installed on the hosted runner.
       # Resolve sdkmanager explicitly because it is not guaranteed to be on PATH.
       - name: Install Android SDK packages
