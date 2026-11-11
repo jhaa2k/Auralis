@@ -100,11 +100,6 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         if (program == 0) return
         val config = settings.sanitized()
-        if (config.barsEnabled) {
-        val count = config.barCount
-        val slot = 2f / count
-        val barWidth = max(0.001f, slot * config.barWidth)
-        val horizontalInset = (slot - barWidth) * 0.5f
         val data = spectrum
         val nowNanos = System.nanoTime()
         val elapsedSeconds = ((nowNanos - rendererStartNanos) / 1_000_000_000.0).toFloat()
@@ -124,6 +119,11 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val positionSignal = measureSignal(config.positionMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val scaleSignal = measureSignal(config.scaleMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val rotationSignal = measureSignal(config.rotationMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
+        if (config.barsEnabled) {
+        val count = config.barCount
+        val slot = 2f / count
+        val barWidth = max(0.001f, slot * config.barWidth)
+        val horizontalInset = (slot - barWidth) * 0.5f
         val amount = config.measureAmount
         val effectivePositionX = (config.positionX + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
         val effectivePositionY = (config.positionY + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
