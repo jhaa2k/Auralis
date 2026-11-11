@@ -372,13 +372,33 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                         val sg = styleChannel(8)
                         val sb = styleChannel(0)
                         val sa = alpha * styleChannel(24)
-                        fun drawAt(left: Float, bottom: Float, right: Float, top: Float, flip: Boolean = false) {
-                            appendShape(style.shape, left, bottom, right, top, sa, sr, sg, sb, flipVertical = flip)
+                        fun mirrorChannel(shift: Int) = ((config.mirrorColor shr shift) and 0xFF).toFloat() / 255f
+                        fun drawAt(
+                            left: Float, bottom: Float, right: Float, top: Float,
+                            flip: Boolean = false, mirrorCopy: Boolean = false,
+                            offsetX: Float = 0f, offsetY: Float = 0f
+                        ) {
+                            val tintR = if (mirrorCopy) mirrorChannel(16) else 1f
+                            val tintG = if (mirrorCopy) mirrorChannel(8) else 1f
+                            val tintB = if (mirrorCopy) mirrorChannel(0) else 1f
+                            val tintA = if (mirrorCopy) mirrorChannel(24) else 1f
+                            appendShape(
+                                style.shape, left + offsetX, bottom + offsetY, right + offsetX, top + offsetY,
+                                sa * tintA, sr * tintR, sg * tintG, sb * tintB,
+                                flipVertical = flip || (mirrorCopy && config.mirrorFlip)
+                            )
                         }
-                        drawAt(x0, segmentBottom, x1, segmentTop, style.flipOther && i % 2 == 1)
-                        if (style.mirror || config.mirror) drawAt(x0, -segmentTop, x1, -segmentBottom, style.flipOther && i % 2 == 1)
-                        if (config.mirrorX) drawAt(-x1, segmentBottom, -x0, segmentTop, style.flipOther && i % 2 == 1)
-                        if (config.mirrorX && (style.mirror || config.mirror)) drawAt(-x1, -segmentTop, -x0, -segmentBottom, style.flipOther && i % 2 == 1)
+                        val alternatingFlip = style.flipOther && i % 2 == 1
+                        drawAt(x0, segmentBottom, x1, segmentTop, alternatingFlip)
+                        if (style.mirror || config.mirror) {
+                            drawAt(x0, -segmentTop, x1, -segmentBottom, alternatingFlip, true, offsetY = config.mirrorOffset)
+                        }
+                        if (config.mirrorX) {
+                            drawAt(-x1, segmentBottom, -x0, segmentTop, alternatingFlip, true, offsetX = config.mirrorOffset)
+                        }
+                        if (config.mirrorX && (style.mirror || config.mirror)) {
+                            drawAt(-x1, -segmentTop, -x0, -segmentBottom, alternatingFlip, true, config.mirrorOffset, config.mirrorOffset)
+                        }
                     }
                     segmentCursor += actualHeight
                 }
