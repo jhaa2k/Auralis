@@ -70,7 +70,7 @@ object ModuleCatalog {
     }
     private fun defaultFor(key: String, kind: SettingKind, min: Float, max: Float, options: List<String>): String =
         when (key) {
-            "visible", "keepAspect", "metadataVariables", "uniformScale", "clearCanvas" -> "true"
+            "visible", "keepAspect", "metadataVariables", "uniformScale", "clearCanvas", "velocityAngle" -> "true"
             "positionX", "positionY", "alignmentX", "alignmentY", "pivotX", "pivotY" -> "0.5"
             "scaleX", "scaleY", "particleScale", "opacity", "opacityStrength", "alpha", "contrast", "saturation", "lineHeight" -> "1"
             "rotation", "splitAmount", "brightness", "colorBlendOffset", "gravityX", "gravityY" -> "0"
