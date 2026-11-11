@@ -297,12 +297,12 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     val barsModule = ModuleCatalog.modules.first { it.id == "BARS" }
     fun layerSetting(key: String, fallback: String): String =
         values["$layerSettingsKey.$key"]
-            ?: values["\${selectedLayer.type}.$key"]
-            ?: if (selectedLayer.type == "BARS") values["BARS.$key"] else null
-            ?: if (selectedLayer.type == "BARS") {
+            ?: values["${selectedLayer.type}.$key"]
+            ?: (if (selectedLayer.type == "BARS") values["BARS.$key"] else null)
+            ?: (if (selectedLayer.type == "BARS") {
                 barsModule.groups.flatMap { it.settings }
                     .firstOrNull { it.key == key }?.defaultValue?.takeIf { it.isNotBlank() }
-            } else null
+            } else null)
             ?: fallback
     fun layerFloat(key: String, fallback: Float): Float =
         layerSetting(key, fallback.toString()).toFloatOrNull() ?: fallback
@@ -311,7 +311,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
 
     val layerVisible = layerBool("visible", true)
     val liveSettings = remember(values, selectedLayerId, selectedLayer.type, playbackPosition, playbackDuration) {
-        val enabledSegments = (1..3).count { layerBool("segment\${it}Enabled", it == 1) }
+        val enabledSegments = (1..3).count { layerBool("segment${it}Enabled", it == 1) }
         VisualizerSettings(
             barCount = layerFloat("barCount", 64f).toInt().coerceIn(16, 128),
             barWidth = layerFloat("barWidth", 0.72f).coerceIn(0.15f, 1f),
