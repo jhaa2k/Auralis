@@ -340,10 +340,13 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         val measurePosition = MeasureWhat.fromLabel(raw("measurePos", "Nothing"))
         val measureScale = MeasureWhat.fromLabel(raw("measureScale", "Nothing"))
         val measureRotation = MeasureWhat.fromLabel(raw("measureRot", "Nothing"))
-        val globalMirror = layers.any { it.type == "MIRROREREFFECT" && runCatching {
-            val effectKey = "layer_${it.id}_${it.type}"
-            values["$effectKey.visible"]?.toBooleanStrictOrNull() ?: true
-        }.getOrDefault(false) }
+        val mirrorMode = layers.firstOrNull { it.type == "MIRROREREFFECT" }?.let { effect ->
+            val effectKey = "layer_${effect.id}_${effect.type}"
+            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+            if (enabled) values["$effectKey.mirrorMode"] ?: "Horizontal" else "None"
+        } ?: "None"
+        val globalMirrorX = mirrorMode in listOf("Vertical", "Both", "Kaleidoscope")
+        val globalMirrorY = mirrorMode in listOf("Horizontal", "Both", "Kaleidoscope")
         val rgbAmount = layers.firstOrNull { it.type == "RGBSPLITEFFECT" }?.let { effect ->
             val effectKey = "layer_${effect.id}_${effect.type}"
             val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
@@ -385,7 +388,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     positionY = number("positionY", 0.5f),
                     scale = ((number("scaleX", 1f) + number("scaleY", 1f)) / 2f).coerceIn(0.1f, 3f),
                     rotation = number("rotation", 0f),
-                    mirror = flag("mirrorX") || flag("mirrorY") || globalMirror,
+                    mirror = flag("mirrorY") || globalMirrorY,
+                    mirrorX = flag("mirrorX") || globalMirrorX,
                     positionMeasure = measurePosition,
                     scaleMeasure = measureScale,
                     rotationMeasure = measureRotation,
@@ -403,8 +407,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 particleSpeed = number("speed", 1f).coerceIn(0.1f, 4f),
                 particleSize = number("startSize", 3f).coerceIn(1f, 12f),
                 particleSpread = number("amountX", 0.8f).coerceIn(0.1f, 2f),
-                particleMirrorX = flag("mirrorX"),
-                particleMirrorY = flag("mirrorY"),
+                particleMirrorX = flag("mirrorX") || globalMirrorX,
+                particleMirrorY = flag("mirrorY") || globalMirrorY,
                 particleRotation = number("vectorAngle", 0f),
                 particleOpacity = number("opacityStrength", 1f).coerceIn(0f, 1f),
                 particleColor = argb("color", 0xFFFFFFFFL),
