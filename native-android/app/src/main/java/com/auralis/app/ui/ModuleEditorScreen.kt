@@ -110,6 +110,11 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     val layerSettingsKey = if (selectedLayer.id == 1 && selectedLayer.type == "BARS") "BARS"
         else "layer_${selectedLayer.id}_${selectedLayer.type}"
     val values by store.values.collectAsState()
+    val compositionLayer = layers.firstOrNull { it.type == "COMPOSITION" }
+    val compositionSettingsKey = compositionLayer?.let { "layer_${it.id}_${it.type}" } ?: "COMPOSITION"
+    val compositionWidth = (values["$compositionSettingsKey.resolutionWidth"] ?: "1920").toIntOrNull()?.coerceIn(1,8192) ?: 1920
+    val compositionHeight = (values["$compositionSettingsKey.resolutionHeight"] ?: "1080").toIntOrNull()?.coerceIn(1,8192) ?: 1080
+    val compositionAspectRatio = compositionWidth.toFloat() / compositionHeight.coerceAtLeast(1)
     val module = ModuleCatalog.modules.firstOrNull { it.id == selectedLayer.type }
         ?: ModuleCatalog.modules.first()
     LaunchedEffect(context) {
@@ -183,7 +188,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 isExporting = true
                 exportProgress = 0f
                 exportStatus = "STARTING EXPORT"
-                val dimensions = exportDimensions(exportResolution, previewAspectRatio)
+                val dimensions = exportDimensions(exportResolution, previewAspectRatio, compositionWidth, compositionHeight)
                 val result = runCatching {
                     VisualizerVideoExporter.export(
                         context = context,
@@ -595,6 +600,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     .fillMaxWidth()
                     .weight(0.35f),
                 aspectRatio = previewAspectRatio,
+                compositionAspectRatio = compositionAspectRatio,
                 onAspectRatioChange = { previewAspectRatio = it },
                 audioStatus = audioStatus,
                 hasAudio = selectedAudioUri != null,
@@ -747,7 +753,10 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                             aspectRatio = previewAspectRatio,
                             onAspectRatioChange = { previewAspectRatio = it },
                             resolution = exportResolution,
-                            onResolutionChange = { exportResolution = it },
+                            onResolutionChange = {
+                                exportResolution = it
+                                if (it == "COMPOSITION") previewAspectRatio = "COMPOSITION"
+                            },
                             fps = exportFps,
                             onFpsChange = { exportFps = it },
                             progress = exportProgress,
@@ -845,6 +854,7 @@ private fun EditorBottomNavigation(
 private fun PreviewPane(
     modifier: Modifier,
     aspectRatio: String,
+    compositionAspectRatio: Float,
     onAspectRatioChange: (String) -> Unit,
     audioStatus: String,
     hasAudio: Boolean,
@@ -897,7 +907,7 @@ private fun PreviewPane(
                 .weight(1f),
             contentAlignment = Alignment.Center
         ) {
-            val ratio = aspectRatio.toAspectRatio()
+            val ratio = aspectRatio.toAspectRatio(compositionAspectRatio)
             val stageWidth = minOf(maxWidth, maxHeight * ratio)
             val stageHeight = stageWidth / ratio
 
@@ -1137,7 +1147,7 @@ private fun AspectRatioMenu(
             onDismissRequest = { expanded = false },
             containerColor = EditorPanel
         ) {
-            listOf("16:9", "9:16", "1:1", "4:3").forEach { ratio ->
+            listOf("16:9", "9:16", "1:1", "4:3", "COMPOSITION").forEach { ratio ->
                 DropdownMenuItem(
                     text = { Text(ratio, color = EditorText, fontSize = 12.sp) },
                     onClick = {
@@ -1648,13 +1658,13 @@ private fun ExportPanel(
 
             ExportChoiceRow(
                 title = "ASPECT RATIO",
-                options = listOf("16:9", "9:16", "1:1", "4:3"),
+                options = listOf("16:9", "9:16", "1:1", "4:3", "COMPOSITION"),
                 selected = aspectRatio,
                 onSelect = onAspectRatioChange
             )
             ExportChoiceRow(
                 title = "RESOLUTION",
-                options = listOf("720p", "1080p", "1440p", "2160p"),
+                options = listOf("720p", "1080p", "1440p", "2160p", "COMPOSITION"),
                 selected = resolution,
                 onSelect = onResolutionChange
             )
@@ -2089,24 +2099,27 @@ private fun queryAudioName(context: android.content.Context, uri: Uri): String {
     } ?: "SELECTED AUDIO"
 }
 
-private fun String.toAspectRatio(): Float = when (this) {
+private fun String.toAspectRatio(compositionRatio: Float = 16f / 9f): Float = when (this) {
     "9:16" -> 9f / 16f
     "1:1" -> 1f
     "4:3" -> 4f / 3f
+    "COMPOSITION" -> compositionRatio.coerceIn(0.05f, 20f)
     else -> 16f / 9f
 }
 
-private fun exportDimensions(resolution: String, aspectRatio: String): Pair<Int, Int> {
+private fun exportDimensions(resolution: String, aspectRatio: String, compositionWidth: Int, compositionHeight: Int): Pair<Int, Int> {
     val longEdge = when (resolution) {
         "720p" -> 1280
         "1080p" -> 1920
         "1440p" -> 2560
+        "COMPOSITION" -> maxOf(compositionWidth, compositionHeight).coerceAtMost(3840)
         else -> 3840
     }
     val raw = when (aspectRatio) {
         "9:16" -> (longEdge * 9f / 16f).roundToInt() to longEdge
         "1:1" -> longEdge to longEdge
         "4:3" -> longEdge to (longEdge * 3f / 4f).roundToInt()
+        "COMPOSITION" -> if (compositionWidth >= compositionHeight) longEdge to (longEdge * compositionHeight.toFloat() / compositionWidth).roundToInt() else (longEdge * compositionWidth.toFloat() / compositionHeight).roundToInt() to longEdge
         else -> longEdge to (longEdge * 9f / 16f).roundToInt()
     }
     val upScale = maxOf(640f / raw.first, 480f / raw.second, 1f)
