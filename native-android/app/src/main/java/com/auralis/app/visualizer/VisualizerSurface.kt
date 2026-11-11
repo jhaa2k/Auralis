@@ -52,7 +52,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var pointAspectHandle = -1
     private var vertexBuffer: FloatBuffer? = null
     private var particleBuffer: FloatBuffer? = null
-    private val vertexCapacity = 128 * (32 * 4 + 2) * 36
+    private val vertexCapacity = 128 * (32 * 20 + 4) * 18
     private val rendererStartNanos = System.nanoTime()
     private var previousBassEnergy = 0f
     private var bassNoiseFloor = 0.025f
@@ -201,7 +201,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val segmentGap = config.segmentGap.coerceIn(0f, 0.45f)
         val previousHeights = previousBarHeights[layerIndex]?.takeIf { it.size == count }
             ?: FloatArray(count).also { previousBarHeights[layerIndex] = it }
-        val vertices = FloatArray(count * (segmentCount * 4 + 2) * 36)
+        val vertices = FloatArray(count * (segmentCount * 20 + 4) * 18)
         var offset = 0
         for (i in 0 until count) {
             val progress = i.toFloat() / (count - 1).coerceAtLeast(1)
@@ -222,27 +222,85 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val green = channel(8)
             val blue = channel(0)
             val alpha = config.opacity * channel(24)
-            fun appendQuad(left: Float, bottom: Float, right: Float, top: Float, a: Float) {
-                val points = floatArrayOf(
-                    left,bottom, right,bottom, right,top,
-                    left,bottom, right,top, left,top
-                )
+            fun appendVertex(x: Float, y: Float, r: Float, g: Float, b: Float, a: Float) {
                 val angle = Math.toRadians(effectiveRotation.toDouble())
                 val cosine = cos(angle).toFloat()
                 val sine = sin(angle).toFloat()
+                val localX = x * effectiveScale
+                val localY = y * effectiveScale
                 val centerX = (effectivePositionX - 0.5f) * 2f
                 val centerY = (0.5f - effectivePositionY) * 2f
-                for (p in 0 until 6) {
-                    val localX = points[p * 2] * effectiveScale
-                    val localY = points[p * 2 + 1] * effectiveScale
-                    val rotatedX = localX * cosine - localY * sine + centerX
-                    val rotatedY = localX * sine + localY * cosine + centerY
-                    vertices[offset++] = rotatedX
-                    vertices[offset++] = rotatedY
-                    vertices[offset++] = red
-                    vertices[offset++] = green
-                    vertices[offset++] = blue
-                    vertices[offset++] = a
+                vertices[offset++] = localX * cosine - localY * sine + centerX
+                vertices[offset++] = localX * sine + localY * cosine + centerY
+                vertices[offset++] = r
+                vertices[offset++] = g
+                vertices[offset++] = b
+                vertices[offset++] = a
+            }
+            fun appendTriangle(
+                ax: Float, ay: Float, bx: Float, by: Float, cx: Float, cy: Float,
+                a: Float, r: Float, g: Float, b: Float
+            ) {
+                appendVertex(ax, ay, r, g, b, a)
+                appendVertex(bx, by, r, g, b, a)
+                appendVertex(cx, cy, r, g, b, a)
+            }
+            fun appendQuad(
+                left: Float, bottom: Float, right: Float, top: Float, a: Float,
+                r: Float = red, g: Float = green, b: Float = blue
+            ) {
+                appendTriangle(left,bottom,right,bottom,right,top,a,r,g,b)
+                appendTriangle(left,bottom,right,top,left,top,a,r,g,b)
+            }
+            fun appendPolygon(
+                left: Float, bottom: Float, right: Float, top: Float,
+                sides: Int, a: Float, r: Float, g: Float, b: Float, star: Boolean = false
+            ) {
+                val cx = (left + right) * 0.5f
+                val cy = (bottom + top) * 0.5f
+                val rx = (right - left) * 0.5f
+                val ry = (top - bottom) * 0.5f
+                val points = ArrayList<Offset>(sides)
+                for (point in 0 until sides) {
+                    val angle = -Math.PI / 2.0 + point * Math.PI * 2.0 / sides
+                    val radius = if (star && point % 2 == 1) 0.42f else 1f
+                    points.add(Offset(
+                        cx + cos(angle).toFloat() * rx * radius,
+                        cy + sin(angle).toFloat() * ry * radius
+                    ))
+                }
+                for (point in points.indices) {
+                    val next = points[(point + 1) % points.size]
+                    val current = points[point]
+                    appendTriangle(cx, cy, current.x, current.y, next.x, next.y, a, r, g, b)
+                }
+            }
+            fun appendShape(
+                shape: String, left: Float, bottom: Float, right: Float, top: Float,
+                a: Float, r: Float, g: Float, b: Float
+            ) {
+                when (shape) {
+                    "None" -> Unit
+                    "Line", "HorizontalLine" ->
+                        appendQuad(left, (bottom + top) * .5f - .0035f, right, (bottom + top) * .5f + .0035f, a, r, g, b)
+                    "VerticalLine" ->
+                        appendQuad((left + right) * .5f - .0035f, bottom, (left + right) * .5f + .0035f, top, a, r, g, b)
+                    "Circle", "Oval" ->
+                        appendPolygon(left, bottom, right, top, 20, a, r, g, b)
+                    "Triangle" ->
+                        appendPolygon(left, bottom, right, top, 3, a, r, g, b)
+                    "Star", "Heart" ->
+                        appendPolygon(left, bottom, right, top, 10, a, r, g, b, star = true)
+                    "Pentagon" ->
+                        appendPolygon(left, bottom, right, top, 5, a, r, g, b)
+                    "Hexagon", "SidedPolygon" ->
+                        appendPolygon(left, bottom, right, top, 6, a, r, g, b)
+                    "Square" -> {
+                        val side = min(right - left, top - bottom)
+                        val cx = (left + right) * .5f
+                        appendQuad(cx - side * .5f, bottom, cx + side * .5f, bottom + side, a, r, g, b)
+                    }
+                    else -> appendQuad(left, bottom, right, top, a, r, g, b)
                 }
             }
             // Soft expanded underlay approximates a glow without an expensive blur pass.
@@ -253,33 +311,40 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 appendQuad(x0 - trailOffset, y0, x1 - trailOffset, previousTop, alpha * config.motionBlurAmount * 0.32f)
             }
             previousHeights[i] = height
-            val segmentHeight = (y1 - y0) / segmentCount
-            for (segment in 0 until segmentCount) {
-                val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
-                val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
-                if (segmentTop > segmentBottom) appendQuad(x0, segmentBottom, x1, segmentTop, alpha)
-            }
-            if (config.mirror) {
-                if (config.glow > 0f) appendQuad(x0 - 0.006f, -y1 - 0.008f, x1 + 0.006f, -y0 + 0.008f, alpha * config.glow * 0.22f)
-                for (segment in 0 until segmentCount) {
-                    val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
-                    val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
-                    if (segmentTop > segmentBottom) appendQuad(x0, -segmentTop, x1, -segmentBottom, alpha)
+            val styles = config.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
+            val standardSegmentHeight = (y1 - y0) / styles.size.coerceAtLeast(1)
+            var segmentCursor = y0
+            styles.forEachIndexed { segmentIndex, style ->
+                val segmentHeight = if (style.fixedHeight > 0f) {
+                    (style.fixedHeight * 0.25f).coerceAtMost(1.5f)
+                } else standardSegmentHeight
+                val actualHeight = (segmentHeight * style.heightMultiplier).coerceIn(0f, 1.5f)
+                val gapSize = actualHeight * segmentGap * 0.5f
+                val segmentBottom = segmentCursor + gapSize
+                val segmentTop = segmentCursor + actualHeight - gapSize
+                if (segmentTop > segmentBottom) {
+                    fun styleChannel(shift: Int): Float {
+                        val from = ((style.colorFrom shr shift) and 0xFF).toFloat()
+                        val to = ((style.colorTo shr shift) and 0xFF).toFloat()
+                        return (from + (to - from) * progress) / 255f
+                    }
+                    val sr = styleChannel(16)
+                    val sg = styleChannel(8)
+                    val sb = styleChannel(0)
+                    val sa = alpha * styleChannel(24)
+                    fun drawAt(left: Float, bottom: Float, right: Float, top: Float) {
+                        appendShape(style.shape, left, bottom, right, top, sa, sr, sg, sb)
+                    }
+                    drawAt(x0, segmentBottom, x1, segmentTop)
+                    if (style.mirror || config.mirror) drawAt(x0, -segmentTop, x1, -segmentBottom)
+                    if (config.mirrorX) drawAt(-x1, segmentBottom, -x0, segmentTop)
+                    if (config.mirrorX && (style.mirror || config.mirror)) drawAt(-x1, -segmentTop, -x0, -segmentBottom)
+                    if (style.flipOther && i % 2 == 1) {
+                        drawAt(x0, segmentCursor + actualHeight - (segmentTop - segmentCursor),
+                            x1, segmentCursor + actualHeight - (segmentBottom - segmentCursor))
+                    }
                 }
-            }
-            if (config.mirrorX) {
-                for (segment in 0 until segmentCount) {
-                    val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
-                    val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
-                    if (segmentTop > segmentBottom) appendQuad(-x1, segmentBottom, -x0, segmentTop, alpha)
-                }
-            }
-            if (config.mirror && config.mirrorX) {
-                for (segment in 0 until segmentCount) {
-                    val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
-                    val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
-                    if (segmentTop > segmentBottom) appendQuad(-x1, -segmentTop, -x0, -segmentBottom, alpha)
-                }
+                segmentCursor += actualHeight
             }
         }
         val buffer = vertexBuffer ?: return
