@@ -907,7 +907,14 @@ fun AuralisApp() {
                 layerId = detailsLayerId,
                 values = modulePropertyValues,
                 onBack = { detailsModule = null },
-                onReset = { modulePropertyValues.keys.filter { it.startsWith("$detailsLayerId/") }.forEach { modulePropertyValues.remove(it) } },
+                onReset = {
+                    modulePropertyValues.keys.filter { it.startsWith("\$detailsLayerId/") }.forEach { modulePropertyValues.remove(it) }
+                    val resetIndex = editorLayers.indexOfFirst { it.id == detailsLayerId }
+                    if (resetIndex >= 0) {
+                        val current = editorLayers[resetIndex]
+                        editorLayers[resetIndex] = EditorLayer(current.id, current.type, current.name)
+                    }
+                },
                 onPickImage = { field -> pendingImageField = field; imagePicker.launch(arrayOf("image/*")) },
                 onPropertyChange = { group, field, value ->
                     val index = editorLayers.indexOfFirst { it.id == detailsLayerId }
