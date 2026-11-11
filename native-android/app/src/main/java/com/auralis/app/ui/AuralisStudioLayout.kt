@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -131,7 +132,7 @@ fun AuralisStudioLayout(
                     Text("▶", color = StudioAccent, modifier = Modifier.clickable(onClick = onPlayPause).padding(7.dp))
                     Text("×", color = StudioWhite, modifier = Modifier.clickable { panelVisible = false }.padding(7.dp))
                 }
-                Row(Modifier.fillMaxWidth().horizontalScrollCompat()) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
                     StudioPanelTab.values().forEach { tab ->
                         Text(tab.label, color = if (tab == activeTab) StudioAccent else StudioMuted,
                             modifier = Modifier.clickable { activeTab = tab }.padding(horizontal = 11.dp, vertical = 9.dp))
@@ -273,6 +274,3 @@ private fun DropdownMenuBox(label: String, options: List<String>, selected: Stri
     }
 }
 
-/** Small helper to keep tab row scrollable without exposing scrollbars. */
-@Composable
-private fun Row.horizontalScrollCompat(): Modifier = Modifier.horizontalScroll(rememberScrollState())
