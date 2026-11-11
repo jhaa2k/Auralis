@@ -205,8 +205,8 @@ object VisualizerVideoExporter {
             GLES20.glClearColor(((background shr 16) and 255).toFloat()/255f, ((background shr 8) and 255).toFloat()/255f, (background and 255).toFloat()/255f, ((background shr 24) and 255).toFloat()/255f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val time = System.nanoTime() / 1_000_000_000.0
-            fun quad(left: Float, bottom: Float, right: Float, top: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings) {
-                val angle = Math.toRadians(config.rotation.toDouble())
+            fun quad(left: Float, bottom: Float, right: Float, top: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings, rotationOffset: Float = 0f) {
+                val angle = Math.toRadians((config.rotation + rotationOffset).toDouble())
                 val cs = cos(angle).toFloat(); val sn = sin(angle).toFloat()
                 val cx = (config.positionX - .5f) * 2f; val cy = (.5f - config.positionY) * 2f
                 val pts = floatArrayOf(left,bottom,right,bottom,right,top,left,bottom,right,top,left,top)
