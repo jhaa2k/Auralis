@@ -651,10 +651,35 @@ fun AuralisApp() {
                                             BasicTextField(value = selected.textContent, onValueChange = { editorLayers[selectedIndex] = selected.copy(textContent = it) }, textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 11.sp), modifier = Modifier.fillMaxWidth().background(StudioBlack, RoundedCornerShape(2.dp)).padding(8.dp))
                                             PropertySlider("Font size", ((selected.fontSize - 8f) / 88f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(fontSize = 8f + it * 88f) }, "8 SP", "96 SP", "${selected.fontSize.toInt()} sp", resetValue = 0.25f)
                                         }
+                                        if (selected.type == "Image" || selected.type == "Particles" || selected.type == "Composition") {
+                                            Button(onClick = { imagePicker.launch(arrayOf("image/*")) }, colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack), shape = RoundedCornerShape(2.dp)) { Text(if (selected.imageUri == null) "PICK IMAGE / PNG" else "REPLACE IMAGE", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                                            PropertyInfoRow("Image source", if (selected.imageUri == null) "No custom image selected" else "Custom image selected")
+                                        }
                                         if (selected.type == "Image") {
-                                            Button(onClick = { imagePicker.launch(arrayOf("image/*")) }, colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack), shape = RoundedCornerShape(2.dp)) { Text(if (selected.imageUri == null) "CHOOSE IMAGE" else "REPLACE IMAGE", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                                            PropertyInfoRow("Image source", if (selected.imageUri == null) "No image selected" else "Device image / loaded")
-                                            PropertyInfoRow("Aspect handling", "Fit / preserve source ratio")
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                listOf("KEEP_ASPECT_RATIO", "CROP_TO_FIT").forEach { mode ->
+                                                    Button(onClick = { editorLayers[selectedIndex] = selected.copy(imageFitMode = mode) }, modifier = Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp), colors = ButtonDefaults.buttonColors(containerColor = if (selected.imageFitMode == mode) StudioAccent else StudioRaised, contentColor = if (selected.imageFitMode == mode) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text(if (mode == "KEEP_ASPECT_RATIO") "KEEP RATIO" else "CROP TO FIT", fontSize = 7.sp) }
+                                                }
+                                            }
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                listOf("GENERATED_ALBUM_ART", "CUSTOM_IMAGE").forEach { mode ->
+                                                    Button(onClick = { editorLayers[selectedIndex] = selected.copy(imageSourceMode = mode) }, modifier = Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp), colors = ButtonDefaults.buttonColors(containerColor = if (selected.imageSourceMode == mode) StudioAccent else StudioRaised, contentColor = if (selected.imageSourceMode == mode) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text(if (mode == "GENERATED_ALBUM_ART") "ALBUM ART" else "CUSTOM IMAGE", fontSize = 7.sp) }
+                                                }
+                                            }
+                                        }
+                                        if (selected.type == "Text") {
+                                            PropertyInfoRow("Tokens", "%title%  %artist%  %time%  %duration%")
+                                            BasicTextField(value = selected.songTitle, onValueChange = { editorLayers[selectedIndex] = selected.copy(songTitle = it) }, textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 10.sp), modifier = Modifier.fillMaxWidth().background(StudioBlack).padding(6.dp))
+                                            BasicTextField(value = selected.artistName, onValueChange = { editorLayers[selectedIndex] = selected.copy(artistName = it) }, textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 10.sp), modifier = Modifier.fillMaxWidth().background(StudioBlack).padding(6.dp))
+                                        }
+                                        if (selected.type == "Composition") {
+                                            PropertyInfoRow("Composition index", "Creation order is immutable")
+                                            PropertyInfoRow("Blend mode", selected.compositionBlendMode)
+                                            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                listOf("NORMAL", "ADD", "SCREEN", "MULTIPLY", "OVERLAY").forEach { mode ->
+                                                    Button(onClick = { editorLayers[selectedIndex] = selected.copy(compositionBlendMode = mode) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(4.dp), colors = ButtonDefaults.buttonColors(containerColor = if (selected.compositionBlendMode == mode) StudioAccent else StudioRaised, contentColor = if (selected.compositionBlendMode == mode) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text(mode, fontSize = 6.sp) }
+                                                }
+                                            }
                                         }
                                     }
                                     "COLOR" -> {
@@ -689,6 +714,20 @@ fun AuralisApp() {
                                             PropertySlider("Movement speed", particleSpeed, { particleSpeed = it }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", 0.1f + particleSpeed * 3.9f), resetValue = 0.35f)
                                             PropertySlider("Particle size", particleSize, { particleSize = it }, "1 PX", "12 PX", "${(1f + particleSize * 11f).toInt()} px", resetValue = 0.25f)
                                             PropertySlider("Spread", particleSpread, { particleSpread = it }, "NARROW", "WIDE", "${((0.1f + particleSpread * 1.9f) * 100).toInt()}%", resetValue = 0.40f)
+                                            PropertySlider("Vector angle", (selected.particleVectorAngle + 360f) / 720f, { editorLayers[selectedIndex] = selected.copy(particleVectorAngle = -360f + it * 720f) }, "-360°", "360°", "${selected.particleVectorAngle.toInt()}°", resetValue = 0.5f)
+                                            PropertySlider("Transparency", selected.particleTransparency, { editorLayers[selectedIndex] = selected.copy(particleTransparency = it) }, "0%", "100%", "${(selected.particleTransparency * 100).toInt()}%", resetValue = 1f)
+                                            if (selected.imageUri != null) PropertyInfoRow("Particle PNG", "Custom image selected; GL texture mapping pending")
+                                        } else if (selected.type == "Blur Effect") {
+                                            PropertySlider("Background softener", selected.blurIntensity / 0.65f, { editorLayers[selectedIndex] = selected.copy(blurIntensity = it * 0.65f) }, "OFF", "SAFE MAX", "${(selected.blurIntensity * 100).toInt()}%", resetValue = 0.15f / 0.65f)
+                                            if (selected.blurIntensity > 0.45f) Text("WARNING: High blur can increase GPU memory and frame time.", color = StudioAccent, fontSize = 8.sp)
+                                            PropertyInfoRow("Safety cap", "0.65 intensity")
+                                        } else if (selected.type == "Motion Blur") {
+                                            PropertySlider("Trailing amount", selected.motionBlurTrailing / 0.65f, { editorLayers[selectedIndex] = selected.copy(motionBlurTrailing = it * 0.65f) }, "LOW", "SAFE MAX", "${(selected.motionBlurTrailing * 100).toInt()}%", resetValue = 0.2f / 0.65f)
+                                            if (selected.motionBlurTrailing > 0.45f) Text("WARNING: High trailing can increase GPU load.", color = StudioAccent, fontSize = 8.sp)
+                                        } else if (selected.type == "Custom Shader") {
+                                            Text("GLSL ES 2.0 SOURCE", color = StudioMuted, fontSize = 8.sp)
+                                            BasicTextField(value = selected.shaderSource, onValueChange = { editorLayers[selectedIndex] = selected.copy(shaderSource = it) }, textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 9.sp), modifier = Modifier.fillMaxWidth().height(120.dp).background(StudioBlack).padding(7.dp))
+                                            PropertyInfoRow("Shader compiler", "Not connected yet")
                                         } else if (selected.type == "RGB Split") {
                                             PropertySlider("Channel separation", selected.rgbSplitAmount, { editorLayers[selectedIndex] = selected.copy(rgbSplitAmount = it) }, "0 PX", "MAX", "${(selected.rgbSplitAmount * 100).toInt()}%", resetValue = 0f)
                                             PropertyInfoRow("Effect scope", "Spectrum geometry only")
