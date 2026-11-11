@@ -471,14 +471,22 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val particleSin = sin(particleRotation).toFloat()
 
             fun colorChannel(color: Long, shift: Int) = ((color shr shift) and 0xFF).toFloat() / 255f
-            fun appendParticle(px: Float, py: Float, color: Long, alphaMultiplier: Float, particlePointSize: Float, particleAngle: Float) {
-                points.put(px); points.put(py)
-                points.put(colorChannel(color, 16))
-                points.put(colorChannel(color, 8))
-                points.put(colorChannel(color, 0))
-                points.put(colorChannel(color, 24) * alphaMultiplier)
+            fun appendParticle(
+                px: Float, py: Float, color: Long, alphaMultiplier: Float,
+                particlePointSize: Float, particleAngle: Float, mirrorCopy: Boolean = false,
+                offsetX: Float = 0f, offsetY: Float = 0f
+            ) {
+                val tintR = if (mirrorCopy) colorChannel(config.mirrorColor, 16) else 1f
+                val tintG = if (mirrorCopy) colorChannel(config.mirrorColor, 8) else 1f
+                val tintB = if (mirrorCopy) colorChannel(config.mirrorColor, 0) else 1f
+                val tintA = if (mirrorCopy) colorChannel(config.mirrorColor, 24) else 1f
+                points.put(px + offsetX); points.put(py + offsetY)
+                points.put(colorChannel(color, 16) * tintR)
+                points.put(colorChannel(color, 8) * tintG)
+                points.put(colorChannel(color, 0) * tintB)
+                points.put(colorChannel(color, 24) * alphaMultiplier * tintA)
                 points.put(particlePointSize)
-                points.put(particleAngle)
+                points.put(particleAngle + if (mirrorCopy && config.mirrorFlip) Math.PI.toFloat() else 0f)
                 renderedParticleCount++
             }
 
@@ -566,27 +574,27 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     appendParticle(x - directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f, particleAngle)
                 }
                 if (config.particleMirrorX) {
-                    appendParticle(-x, y, color, alpha, particlePointSize, particleAngle)
+                    appendParticle(-x, y, color, alpha, particlePointSize, particleAngle, true, config.mirrorOffset)
                     if (config.particleTrailLength > 0f) {
                         val tailDistance = config.particleTrailLength * 0.003f
-                        appendParticle(-x + directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f, particleAngle)
-                        appendParticle(-x + directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f, particleAngle)
+                        appendParticle(-x + directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f, particleAngle, true, config.mirrorOffset)
+                        appendParticle(-x + directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f, particleAngle, true, config.mirrorOffset)
                     }
                 }
                 if (config.particleMirrorY) {
-                    appendParticle(x, -y, color, alpha, particlePointSize, particleAngle)
+                    appendParticle(x, -y, color, alpha, particlePointSize, particleAngle, true, 0f, config.mirrorOffset)
                     if (config.particleTrailLength > 0f) {
                         val tailDistance = config.particleTrailLength * 0.003f
-                        appendParticle(x - directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f, particleAngle)
-                        appendParticle(x - directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f, particleAngle)
+                        appendParticle(x - directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f, particleAngle, true, 0f, config.mirrorOffset)
+                        appendParticle(x - directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f, particleAngle, true, 0f, config.mirrorOffset)
                     }
                 }
                 if (config.particleMirrorX && config.particleMirrorY) {
-                    appendParticle(-x, -y, color, alpha, particlePointSize, particleAngle)
+                    appendParticle(-x, -y, color, alpha, particlePointSize, particleAngle, true, config.mirrorOffset, config.mirrorOffset)
                     if (config.particleTrailLength > 0f) {
                         val tailDistance = config.particleTrailLength * 0.003f
-                        appendParticle(-x + directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f, particleAngle)
-                        appendParticle(-x + directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f, particleAngle)
+                        appendParticle(-x + directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f, particlePointSize * 0.78f, particleAngle, true, config.mirrorOffset, config.mirrorOffset)
+                        appendParticle(-x + directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f, particlePointSize * 0.58f, particleAngle, true, config.mirrorOffset, config.mirrorOffset)
                     }
                 }
             }
