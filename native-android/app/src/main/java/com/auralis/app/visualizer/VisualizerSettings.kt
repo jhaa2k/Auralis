@@ -12,6 +12,7 @@ data class VisualizerSettings(
     val scale: Float = 1f,
     val rotation: Float = 0f,
     val particlesEnabled: Boolean = false,
+    val barsEnabled: Boolean = true,
     val particleCount: Int = 120,
     val particleSpeed: Float = 1f,
     val particleSize: Float = 3f,
