@@ -46,7 +46,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var tintHandle = 0
     private var vertexBuffer: FloatBuffer? = null
     private var particleBuffer: FloatBuffer? = null
-    private val vertexCapacity = 128 * 66 * 6 * 6
+    private val vertexCapacity = 128 * (32 * 4 + 2) * 36
     private val rendererStartNanos = System.nanoTime()
     private var previousBassEnergy = 0f
     private var bassNoiseFloor = 0.025f
@@ -170,7 +170,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val segmentGap = config.segmentGap.coerceIn(0f, 0.45f)
         val previousHeights = previousBarHeights[layerIndex]?.takeIf { it.size == count }
             ?: FloatArray(count).also { previousBarHeights[layerIndex] = it }
-        val vertices = FloatArray(count * 66 * 6 * 6)
+        val vertices = FloatArray(count * (segmentCount * 4 + 2) * 36)
         var offset = 0
         for (i in 0 until count) {
             val progress = i.toFloat() / (count - 1).coerceAtLeast(1)
