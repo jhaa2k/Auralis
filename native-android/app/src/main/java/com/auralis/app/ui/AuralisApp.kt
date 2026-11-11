@@ -512,24 +512,60 @@ fun AuralisApp() {
 
                 Surface(
                     color = StudioBlack,
-                    shape = RoundedCornerShape(3.dp),
+                    shape = RoundedCornerShape(5.dp),
                     border = BorderStroke(1.dp, StudioLine),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(Modifier.padding(horizontal = 9.dp, vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
+                    Column(
+                        Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Surface(
+                                color = StudioRaised,
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Outlined.GraphicEq, contentDescription = "Track artwork", tint = StudioAccent, modifier = Modifier.size(23.dp))
+                                }
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(
-                                    selectedTrackName ?: "NO TRACK LOADED",
+                                    selectedTrackName ?: "Choose a track to begin",
                                     color = StudioWhite,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text(playerMessage, color = StudioMuted, fontSize = 8.sp)
+                                Text(
+                                    if (isPlaying) "NOW PLAYING" else playerMessage.uppercase(Locale.US),
+                                    color = if (isPlaying) StudioAccent else StudioMuted,
+                                    fontSize = 8.sp,
+                                    letterSpacing = 1.sp
+                                )
                             }
-                            Text("${formatTime(playbackPosition)} / ${formatTime(playbackDuration)}", color = StudioMuted, fontSize = 9.sp)
+                            Box {
+                                Text(
+                                    "${playbackSpeed}×",
+                                    color = StudioWhite,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier
+                                        .background(StudioRaised, RoundedCornerShape(3.dp))
+                                        .clickable { speedMenuExpanded = true }
+                                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                                )
+                                DropdownMenu(expanded = speedMenuExpanded, onDismissRequest = { speedMenuExpanded = false }) {
+                                    listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
+                                        DropdownMenuItem(
+                                            text = { Text("${speed}×") },
+                                            onClick = { playbackSpeed = speed; mediaController?.setPlaybackSpeed(speed); speedMenuExpanded = false }
+                                        )
+                                    }
+                                }
+                            }
                         }
                         TimelineSeekBar(
                             positionMs = playbackPosition,
@@ -537,49 +573,62 @@ fun AuralisApp() {
                             enabled = mediaController != null && playbackDuration > 0L,
                             onSeek = { target -> playbackPosition = target; mediaController?.seekTo(target) }
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Button(onClick = { mediaController?.let { it.seekTo((it.currentPosition - 10_000L).coerceAtLeast(0L)) } }, enabled = selectedTrackUri != null, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("-10", fontSize = 8.sp) }
-                            Button(onClick = { isLooping = !isLooping; mediaController?.repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = if (isLooping) StudioAccent else StudioRaised, contentColor = if (isLooping) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text(if (isLooping) "LOOP ON" else "LOOP OFF", fontSize = 8.sp) }
-                            Button(onClick = { mediaController?.let { it.seekTo((it.currentPosition + 10_000L).coerceAtMost(it.duration.coerceAtLeast(0L))) } }, enabled = selectedTrackUri != null, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("+10", fontSize = 8.sp) }
-                            Box {
-                                Button(onClick = { speedMenuExpanded = true }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("${playbackSpeed}×", fontSize = 8.sp) }
-                                DropdownMenu(expanded = speedMenuExpanded, onDismissRequest = { speedMenuExpanded = false }) {
-                                    listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
-                                        DropdownMenuItem(text = { Text("${speed}×") }, onClick = { playbackSpeed = speed; mediaController?.setPlaybackSpeed(speed); speedMenuExpanded = false })
-                                    }
-                                }
-                            }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(formatTime(playbackPosition), color = StudioMuted, fontSize = 8.sp, modifier = Modifier.weight(1f))
+                            Text(formatTime(playbackDuration), color = StudioMuted, fontSize = 8.sp)
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Button(
                                 onClick = { audioPicker.launch(arrayOf("audio/*")) },
-                                colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack),
-                                shape = RoundedCornerShape(3.dp),
-                                modifier = Modifier.weight(1f).height(38.dp)
+                                modifier = Modifier.weight(1f).height(38.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite),
+                                shape = RoundedCornerShape(3.dp)
                             ) {
-                                Icon(Icons.Outlined.AudioFile, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text("  IMPORT AUDIO", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Outlined.AudioFile, contentDescription = null, modifier = Modifier.size(15.dp))
+                                Text("  IMPORT", fontSize = 9.sp, fontWeight = FontWeight.Bold)
                             }
+                            Button(
+                                onClick = { mediaController?.let { it.seekTo((it.currentPosition - 10_000L).coerceAtLeast(0L)) } },
+                                enabled = selectedTrackUri != null,
+                                modifier = Modifier.height(38.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite),
+                                shape = RoundedCornerShape(3.dp)
+                            ) { Text("−10", fontSize = 9.sp) }
                             Button(
                                 onClick = {
                                     mediaController?.let { player ->
-                                        if (player.isPlaying) player.pause()
-                                        else if (player.mediaItemCount > 0) player.play()
+                                        if (player.isPlaying) player.pause() else if (player.mediaItemCount > 0) player.play()
                                     }
                                 },
                                 enabled = (mediaController?.mediaItemCount ?: 0) > 0,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = StudioRaised,
-                                    contentColor = StudioWhite,
-                                    disabledContainerColor = StudioRaised,
-                                    disabledContentColor = StudioMuted
-                                ),
-                                shape = RoundedCornerShape(3.dp),
-                                modifier = Modifier.height(38.dp)
+                                modifier = Modifier.size(42.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack),
+                                shape = RoundedCornerShape(4.dp)
                             ) {
-                                Icon(if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow, contentDescription = null, modifier = Modifier.size(17.dp))
-                                Text(if (isPlaying) " PAUSE" else " PLAY", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Icon(if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow, contentDescription = if (isPlaying) "Pause" else "Play", modifier = Modifier.size(22.dp))
                             }
+                            Button(
+                                onClick = { mediaController?.let { it.seekTo((it.currentPosition + 10_000L).coerceAtMost(it.duration.coerceAtLeast(0L))) } },
+                                enabled = selectedTrackUri != null,
+                                modifier = Modifier.height(38.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite),
+                                shape = RoundedCornerShape(3.dp)
+                            ) { Text("+10", fontSize = 9.sp) }
+                            Button(
+                                onClick = { isLooping = !isLooping; mediaController?.repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF },
+                                modifier = Modifier.height(38.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 9.dp, vertical = 4.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isLooping) StudioAccent.copy(alpha = 0.18f) else StudioRaised, contentColor = if (isLooping) StudioAccent else StudioWhite),
+                                shape = RoundedCornerShape(3.dp)
+                            ) { Text(if (isLooping) "LOOP" else "↻", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                         }
                     }
                 }
