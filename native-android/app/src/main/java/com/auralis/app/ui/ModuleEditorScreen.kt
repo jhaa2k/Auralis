@@ -1051,7 +1051,8 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         val x = value("positionX", "0.5").toFloatOrNull() ?: 0.5f
         val y = value("positionY", "0.5").toFloatOrNull() ?: 0.5f
         val sx = value("scaleX", "1").toFloatOrNull() ?: 1f
-        val sy = value("scaleY", "1").toFloatOrNull() ?: 1f
+        val uniformScale = value("uniformScale", "true").toBooleanStrictOrNull() ?: true
+        val sy = if (uniformScale) sx else value("scaleY", "1").toFloatOrNull() ?: 1f
         val rotation = value("rotation", "0").toFloatOrNull() ?: 0f
         val size = value("fontSize", "30").toFloatOrNull()?.coerceIn(6f, 300f) ?: 30f
         val color = runCatching { Color(android.graphics.Color.parseColor(value("textColor", "#FFFFFFFF"))) }.getOrDefault(Color.White)
@@ -1177,7 +1178,8 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
         val x = (values["$key.positionX"] ?: values["IMAGE.positionX"])?.toFloatOrNull() ?: 0.5f
         val y = (values["$key.positionY"] ?: values["IMAGE.positionY"])?.toFloatOrNull() ?: 0.5f
         val sx = (values["$key.scaleX"] ?: values["IMAGE.scaleX"])?.toFloatOrNull() ?: 1f
-        val sy = (values["$key.scaleY"] ?: values["IMAGE.scaleY"])?.toFloatOrNull() ?: 1f
+        val uniformScale = (values["$key.uniformScale"] ?: values["IMAGE.uniformScale"] ?: "true").toBooleanStrictOrNull() ?: true
+        val sy = if (uniformScale) sx else (values["$key.scaleY"] ?: values["IMAGE.scaleY"])?.toFloatOrNull() ?: 1f
         val rotation = (values["$key.rotation"] ?: values["IMAGE.rotation"])?.toFloatOrNull() ?: 0f
         val opacity = (values["$key.opacityStrength"] ?: values["IMAGE.opacityStrength"])?.toFloatOrNull() ?: 1f
         val keepAspect = (values["$key.keepAspect"] ?: values["IMAGE.keepAspect"] ?: "true").toBooleanStrictOrNull() != false
