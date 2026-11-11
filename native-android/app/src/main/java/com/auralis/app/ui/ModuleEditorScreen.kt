@@ -1151,6 +1151,7 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
         ))
         val keepAspect = (values["$key.keepAspect"] ?: values["IMAGE.keepAspect"] ?: "true").toBooleanStrictOrNull() != false
         val cropToFit = (values["$key.cropToFit"] ?: values["IMAGE.cropToFit"] ?: "false").toBooleanStrictOrNull() == true
+        val imageShapeName = values["$key.shape"] ?: values["IMAGE.shape"] ?: "Rectangle"
         val imageContentScale = when {
             cropToFit -> androidx.compose.ui.layout.ContentScale.Crop
             keepAspect -> androidx.compose.ui.layout.ContentScale.Fit
@@ -1160,6 +1161,7 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
             modifier = Modifier.align(Alignment.Center).offset {
                 IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight).toInt())
             }.size(width = maxWidth * 0.42f, height = maxHeight * 0.42f)
+                .clip(imageClipShape(imageShapeName))
                 .graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f), scaleY = sy.coerceIn(0.05f, 8f), rotationZ = rotation, alpha = opacity.coerceIn(0f, 1f)),
             contentAlignment = Alignment.Center
         ) {
@@ -1173,6 +1175,48 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
         }
     }
 }
+
+private fun imageClipShape(name: String): androidx.compose.ui.graphics.Shape {
+    if (name == "None" || name == "Rectangle" || name == "CustomPath" || name == "WaveformPath") {
+        return androidx.compose.ui.graphics.RectangleShape
+    }
+    return object : androidx.compose.ui.graphics.Shape {
+        override fun createOutline(
+            size: androidx.compose.ui.geometry.Size,
+            layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+            density: androidx.compose.ui.unit.Density
+        ): androidx.compose.ui.graphics.Outline {
+            val width = size.width
+            val height = size.height
+            val path = androidx.compose.ui.graphics.Path()
+            if (name == "Circle" || name == "Oval") {
+                path.addOval(androidx.compose.ui.geometry.Rect(0f, 0f, width, height))
+            } else {
+                val sides = when (name) {
+                    "Triangle" -> 3
+                    "Pentagon" -> 5
+                    "Hexagon", "SidedPolygon" -> 6
+                    "Star", "Heart" -> 10
+                    "Square" -> 4
+                    else -> 4
+                }
+                val radius = if (name == "Square") minOf(width, height) * 0.5f else minOf(width, height) * 0.5f
+                val centerX = width * 0.5f
+                val centerY = height * 0.5f
+                for (index in 0 until sides) {
+                    val angle = -Math.PI / 2.0 + index * Math.PI * 2.0 / sides
+                    val pointRadius = if (name == "Star" && index % 2 == 1) radius * 0.42f else radius
+                    val x = centerX + kotlin.math.cos(angle).toFloat() * pointRadius
+                    val y = centerY + kotlin.math.sin(angle).toFloat() * pointRadius
+                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                path.close()
+            }
+            return androidx.compose.ui.graphics.Outline.Generic(path)
+        }
+    }
+}
+
 @Composable
 private fun AspectRatioMenu(
     selected: String,
