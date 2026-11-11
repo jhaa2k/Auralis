@@ -65,6 +65,7 @@ data class VisualizerSettings(
     val barHeight: Float = 1f,
     val barMinHeight: Float = 0f,
     val flipInput: Boolean = false,
+    val colorBlendOffset: Float = 0f,
     val barColorFrom: Long = 0xFFFFFFFF,
     val barColorTo: Long = 0xFF00FFFF,
     val particleColor: Long = 0xFFFFFFFF,
@@ -140,6 +141,7 @@ data class VisualizerSettings(
         barWidth = barWidth.coerceIn(0.15f, 1f),
         barHeight = barHeight.coerceIn(0.1f, 2f),
         barMinHeight = barMinHeight.coerceIn(0f, 1f),
+        colorBlendOffset = colorBlendOffset.coerceIn(0f, 1f),
         segmentCount = segmentCount.coerceIn(1, 32),
         segmentStyles = segmentStyles.take(3).map { it.sanitized() },
         segmentGap = segmentGap.coerceIn(0f, 0.45f)
