@@ -39,7 +39,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     private var tintHandle = 0
     private var vertexBuffer: FloatBuffer? = null
     private var particleBuffer: FloatBuffer? = null
-    private val vertexCapacity = 128 * 24 * 6
+    private val vertexCapacity = 128 * 66 * 6 * 6
     private val rendererStartNanos = System.nanoTime()
     private var previousBassEnergy = 0f
     private var bassNoiseFloor = 0.025f
@@ -128,7 +128,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val effectivePositionY = (config.positionY + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
         val effectiveScale = (config.scale * (1f + (scaleSignal - 0.5f) * amount)).coerceIn(0.1f, 3f)
         val effectiveRotation = config.rotation + (rotationSignal - 0.5f) * amount * 90f
-        val vertices = FloatArray(count * 24 * 6)
+        val segmentCount = config.segmentCount.coerceIn(1, 32)
+        val segmentGap = config.segmentGap.coerceIn(0f, 0.45f)
+        val vertices = FloatArray(count * 66 * 6 * 6)
         var offset = 0
         for (i in 0 until count) {
             val sourceIndex = (i.toFloat() / count * data.size).toInt().coerceIn(0, data.lastIndex)
@@ -168,10 +170,19 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             }
             // Soft expanded underlay approximates a glow without an expensive blur pass.
             if (config.glow > 0f) appendQuad(x0 - 0.006f, y0 - 0.008f, x1 + 0.006f, y1 + 0.008f, alpha * config.glow * 0.22f)
-            appendQuad(x0, y0, x1, y1, alpha)
+            val segmentHeight = (y1 - y0) / segmentCount
+            for (segment in 0 until segmentCount) {
+                val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
+                val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
+                if (segmentTop > segmentBottom) appendQuad(x0, segmentBottom, x1, segmentTop, alpha)
+            }
             if (config.mirror) {
                 if (config.glow > 0f) appendQuad(x0 - 0.006f, -y1 - 0.008f, x1 + 0.006f, -y0 + 0.008f, alpha * config.glow * 0.22f)
-                appendQuad(x0, -y1, x1, -y0, alpha)
+                for (segment in 0 until segmentCount) {
+                    val segmentBottom = y0 + segment * segmentHeight + segmentHeight * segmentGap * 0.5f
+                    val segmentTop = y0 + (segment + 1) * segmentHeight - segmentHeight * segmentGap * 0.5f
+                    if (segmentTop > segmentBottom) appendQuad(x0, -segmentTop, x1, -segmentBottom, alpha)
+                }
             }
         }
         val buffer = vertexBuffer ?: return
