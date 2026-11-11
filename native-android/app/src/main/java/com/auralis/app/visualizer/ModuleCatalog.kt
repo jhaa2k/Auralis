@@ -147,14 +147,14 @@ object ModuleCatalog {
                 group("Bars Setup",
                     s("flipInput","Flip Input",SettingKind.CHECKBOX),
                     s("heightScale","Height Scale",max=2f), s("minHeightScale","Min Height Scale"),
-                    s("maxHeightScale","Max Height Scale"), s("shapePath","Shape Path",SettingKind.DROPDOWN,options=shapes),
+                    s("maxHeightScale","Max Height Scale"), s("shapePath","Shape Path",SettingKind.DROPDOWN,options=shapes,default="Rectangle"),
                     s("colorBlendOffset","Color Blend Offset"), s("barCount","Bar Count",max=128f,default="64"),
                     s("barSpacing","Bar Spacing"), s("barWidth","Bar Width")
                 )
             ) + (1..3).map { n ->
                 group("Segment $n",
                     s("segment${n}Enabled","Enable Segment",SettingKind.CHECKBOX,default=if(n==1)"true" else "false"),
-                    s("segment${n}Shape","Shape Path",SettingKind.DROPDOWN,options=shapes),
+                    s("segment${n}Shape","Shape Path",SettingKind.DROPDOWN,options=shapes,default="Rectangle"),
                     s("segment${n}ColorFrom","Color From",SettingKind.COLOR,default="#FFFFFFFF"),
                     s("segment${n}ColorTo","Color To",SettingKind.COLOR,default="#FF00FFFF"),
                     s("segment${n}FixedHeight","Fixed Height"), s("segment${n}HeightMultiplier","Bar Height Multiplier"),
