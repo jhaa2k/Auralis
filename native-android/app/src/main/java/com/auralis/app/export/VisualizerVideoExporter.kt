@@ -190,7 +190,11 @@ object VisualizerVideoExporter {
             val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
             val requiredFloats = configs.sumOf { layer ->
                 val bars = if (layer.barsEnabled) layer.barCount.coerceIn(16,128) * (layer.segmentCount.coerceIn(1,32) * 4 + 2) * 36 else 0
-                val particles = if (layer.particlesEnabled) layer.particleCount.coerceIn(0,400) * 36 else 0
+                val particleMirrors = 1 + (if (layer.particleMirrorX) 1 else 0) +
+                    (if (layer.particleMirrorY) 1 else 0) +
+                    (if (layer.particleMirrorX && layer.particleMirrorY) 1 else 0)
+                val particleTails = if (layer.particleTrailLength > 0f) 3 else 1
+                val particles = if (layer.particlesEnabled) layer.particleCount.coerceIn(0,5000) * particleMirrors * particleTails * 36 else 0
                 bars + particles
             }.coerceAtLeast(36)
             if (buf.capacity() < requiredFloats) {
@@ -240,17 +244,105 @@ object VisualizerVideoExporter {
                         }
                     }
                 }
-                if (config.particlesEnabled) {
-                    val count=config.particleCount.coerceIn(0,400)
-                    for(i in 0 until count) {
-                        val seed=i.toFloat(); val phase=((time*config.particleSpeed*.12+seed*.6180339)%1.0).toFloat()
-                        val angle=seed*2.3999632f; val radius=(.12f+(seed*.7548776f%1f)*config.particleSpread)*(.65f+bands.average().toFloat()*.75f)
-                        val x=cos((angle+time.toFloat()*.1f*config.particleSpeed)).toFloat()*radius
-                        val y=phase*2f-1f+sin((angle*1.7f+time.toFloat()*.4f)).toFloat()*.08f
-                        val half=(config.particleSize.coerceIn(1f,12f)/160f)*config.particleScale
-                        val color=config.particleColor
-                        val alpha=config.particleOpacity*(((color shr 24) and 255).toFloat()/255f)
-                        quad(x-half,y-half,x+half,y+half,(((color shr 16) and 255).toFloat()/255f),(((color shr 8) and 255).toFloat()/255f),((color and 255).toFloat()/255f),alpha,config)
+                if (config.particlesEnabled && config.particleCount > 0) {
+                    val count = config.particleCount.coerceIn(0, 5000)
+                    val energy = bands.average().toFloat().coerceIn(0f, 1f)
+                    fun channel(color: Long, shift: Int) = ((color shr shift) and 255).toFloat() / 255f
+                    for (i in 0 until count) {
+                        val seed = i.toFloat() + 1f
+                        val randomA = (kotlin.math.abs(sin(seed * 12.9898f) * 43758.5453f) % 1f)
+                        val randomB = (kotlin.math.abs(sin(seed * 78.233f) * 19341.381f) % 1f)
+                        val life = config.particleLifetime.coerceAtLeast(0.1f)
+                        val phase = (((time / life) + randomA) % 1.0).toFloat().coerceIn(0f, 1f)
+                        val seedAngle = seed * 2.3999632f
+                        val radius = kotlin.math.sqrt(randomB)
+                        val spawn = when (config.particleSpawnArea) {
+                            "Circle" -> Pair(cos(seedAngle) * radius * config.particleSpread * .5f, sin(seedAngle) * radius * config.particleSpreadY * .5f)
+                            "Line" -> Pair((randomA - .5f) * config.particleSpread, 0f)
+                            "Point" -> Pair(0f, 0f)
+                            else -> Pair((randomA - .5f) * config.particleSpread, (randomB - .5f) * config.particleSpreadY)
+                        }
+                        var direction = Math.toRadians(((if (config.particleRandomVector) randomB * 360f else config.particleVectorAngle) + config.particleVectorAngleZ * phase).toDouble())
+                        if (config.particleVectorRelative) direction += kotlin.math.atan2(-spawn.second.toDouble(), -spawn.first.toDouble())
+                        val directionX = cos(direction).toFloat()
+                        val directionY = sin(direction).toFloat()
+                        val randomSpeed = (1f + (randomA * 2f - 1f) * config.particleSpeedRandom / 10f).coerceAtLeast(0f)
+                        val travel = (phase - .5f) * config.particleSpeed * randomSpeed * .42f
+                        var baseX = spawn.first + directionX * travel
+                        var baseY = spawn.second + directionY * travel
+                        when (config.particleForceField) {
+                            "Gravity" -> {
+                                baseX += config.particleGravityX * phase * phase * .025f
+                                baseY += config.particleGravityY * phase * phase * .025f
+                            }
+                            "Wind" -> baseX += config.particleSpeed * phase * .09f
+                            "Vortex" -> {
+                                val vortexAngle = phase * 6.2831853f
+                                val vx = baseX * cos(vortexAngle) - baseY * sin(vortexAngle)
+                                val vy = baseX * sin(vortexAngle) + baseY * cos(vortexAngle)
+                                baseX = vx; baseY = vy
+                            }
+                            "Attractor", "Repeller" -> {
+                                val force = if (config.particleForceField == "Attractor") -1f else 1f
+                                baseX += baseX * force * phase * .55f
+                                baseY += baseY * force * phase * .55f
+                            }
+                        }
+                        val wave = sin(phase * config.particleWaveFrequency * 6.2831853f + seedAngle) * config.particleWaveMagnitude * .025f
+                        baseX += -directionY * wave
+                        baseY += directionX * wave
+                        val measureOffsetX = (config.particlePositionX - .5f) * 2f
+                        val measureOffsetY = (.5f - config.particlePositionY) * 2f
+                        val x = (baseX * config.particleScale + measureOffsetX).coerceIn(-1.4f, 1.4f)
+                        val y = (baseY * config.particleScale + measureOffsetY).coerceIn(-1.4f, 1.4f)
+                        val fadeWindow = (config.particleFadeInOutTime / life).coerceIn(0f, .5f)
+                        val fadeIn = if (fadeWindow <= 0f) 1f else (phase / fadeWindow).coerceIn(0f, 1f)
+                        val fadeOut = if (fadeWindow <= 0f) 1f else ((1f - phase) / fadeWindow).coerceIn(0f, 1f)
+                        val alphaFactor = config.particleOpacity * (.3f + energy * .7f) * fadeIn * fadeOut
+                        fun mix(shift: Int) = channel(config.particleColor, shift) +
+                            (channel(config.particleColorTo, shift) - channel(config.particleColor, shift)) * phase
+                        val red = mix(16); val green = mix(8); val blue = mix(0)
+                        val alpha = mix(24) * alphaFactor
+                        val startSize = if (config.particleFadeInSize > 0f) config.particleFadeInSize else config.particleSize
+                        val endSize = (config.particleEndSize + (randomB * 2f - 1f) * config.particleEndSizeRandom).coerceIn(0f, 64f)
+                        val size = (startSize + (endSize - startSize) * phase) * config.particleScale / 160f
+                        val halfX = size * config.particleSizeAspectRatio
+                        val halfY = size
+                        val drawAngle = if (config.particleVelocityAngle) Math.toDegrees(direction).toFloat() else config.particleRotation
+                        fun drawParticle(px: Float, py: Float, alphaMul: Float = 1f, sizeMul: Float = 1f) {
+                            val hx = halfX * sizeMul; val hy = halfY * sizeMul
+                            quad(px-hx,py-hy,px+hx,py+hy,red,green,blue,alpha*alphaMul,config,drawAngle)
+                        }
+                        drawParticle(x, y)
+                        if (config.particleTrailLength > 0f) {
+                            val tail = config.particleTrailLength * .003f
+                            drawParticle(x-directionX*tail,y-directionY*tail,.42f,.78f)
+                            drawParticle(x-directionX*tail*2f,y-directionY*tail*2f,.18f,.58f)
+                        }
+                        if (config.particleMirrorX) {
+                            drawParticle(-x, y)
+                            if (config.particleTrailLength > 0f) {
+                                val tail = config.particleTrailLength * .003f
+                                drawParticle(-x+directionX*tail,y-directionY*tail,.42f,.78f)
+                                drawParticle(-x+directionX*tail*2f,y-directionY*tail*2f,.18f,.58f)
+                            }
+                        }
+                        if (config.particleMirrorY) {
+                            drawParticle(x, -y)
+                            if (config.particleTrailLength > 0f) {
+                                val tail = config.particleTrailLength * .003f
+                                drawParticle(x-directionX*tail,-y+directionY*tail,.42f,.78f)
+                                drawParticle(x-directionX*tail*2f,-y+directionY*tail*2f,.18f,.58f)
+                            }
+                        }
+                        if (config.particleMirrorX && config.particleMirrorY) {
+                            drawParticle(-x, -y)
+                            if (config.particleTrailLength > 0f) {
+                                val tail = config.particleTrailLength * .003f
+                                drawParticle(-x+directionX*tail,-y+directionY*tail,.42f,.78f)
+                                drawParticle(-x+directionX*tail*2f,-y+directionY*tail*2f,.18f,.58f)
+                            }
+                        }
                     }
                 }
             }
