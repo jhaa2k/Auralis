@@ -1126,11 +1126,45 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
     val uriString = values["$key.pickImage"] ?: values["IMAGE.pickImage"] ?: values["$key.fallbackImage"]
     val visible = (values["$key.visible"] ?: values["IMAGE.visible"] ?: "true").toBooleanStrictOrNull() ?: true
     if (!visible || uriString.isNullOrBlank()) return
-    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, uriString) {
+    val sourceBitmap by produceState<android.graphics.Bitmap?>(initialValue = null, uriString) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching { context.contentResolver.openInputStream(Uri.parse(uriString))?.use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
         }
     }
+    val maskUri = values["$key.maskImage"] ?: values["IMAGE.maskImage"]
+    val maskBitmap by produceState<android.graphics.Bitmap?>(initialValue = null, maskUri) {
+        value = if (maskUri.isNullOrBlank()) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { context.contentResolver.openInputStream(Uri.parse(maskUri))?.use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
+        }
+    }
+    val enableColorKey = (values["$key.enableColorKey"] ?: values["IMAGE.enableColorKey"] ?: "false").toBooleanStrictOrNull() ?: false
+    val keyColor = values["$key.keyColor"] ?: values["IMAGE.keyColor"] ?: "#FF00FF00"
+    val threshold = (values["$key.threshold"] ?: values["IMAGE.threshold"] ?: "0.12").toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.12f
+    val keySoftness = (values["$key.softness"] ?: values["IMAGE.softness"] ?: "0.08").toFloatOrNull()?.coerceIn(0f, 1f) ?: 0.08f
+    val hueShift = (values["$key.hueShift"] ?: values["IMAGE.hueShift"] ?: "0").toFloatOrNull()?.coerceIn(-180f, 180f) ?: 0f
+    val brightness = (values["$key.brightness"] ?: values["IMAGE.brightness"])?.toFloatOrNull() ?: 0f
+    val contrast = ((values["$key.contrast"] ?: values["IMAGE.contrast"])?.toFloatOrNull() ?: 1f).coerceIn(0f, 3f)
+    val saturation = ((values["$key.saturation"] ?: values["IMAGE.saturation"])?.toFloatOrNull() ?: 1f).coerceIn(0f, 3f)
+    val tint = values["$key.tint"] ?: values["IMAGE.tint"] ?: "#FFFFFFFF"
+    val maskMode = values["$key.maskMode"] ?: values["IMAGE.maskMode"] ?: "Alpha"
+    var processedBitmap by remember(uriString) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(sourceBitmap, maskBitmap, enableColorKey, keyColor, threshold, keySoftness, hueShift, brightness, contrast, saturation, tint, maskMode) {
+        val source = sourceBitmap
+        if (source == null) {
+            processedBitmap = null
+        } else {
+            delay(70)
+            processedBitmap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching {
+                    transformImageBitmap(
+                        source, maskBitmap, enableColorKey, keyColor, threshold, keySoftness,
+                        hueShift, brightness, contrast, saturation, tint, maskMode
+                    )
+                }.getOrDefault(source)
+            }
+        }
+    }
+    val bitmap = processedBitmap ?: sourceBitmap
     if (bitmap == null) return
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val x = (values["$key.positionX"] ?: values["IMAGE.positionX"])?.toFloatOrNull() ?: 0.5f
@@ -1139,19 +1173,6 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
         val sy = (values["$key.scaleY"] ?: values["IMAGE.scaleY"])?.toFloatOrNull() ?: 1f
         val rotation = (values["$key.rotation"] ?: values["IMAGE.rotation"])?.toFloatOrNull() ?: 0f
         val opacity = (values["$key.opacityStrength"] ?: values["IMAGE.opacityStrength"])?.toFloatOrNull() ?: 1f
-        val brightness = (values["$key.brightness"] ?: values["IMAGE.brightness"])?.toFloatOrNull() ?: 0f
-        val contrast = ((values["$key.contrast"] ?: values["IMAGE.contrast"])?.toFloatOrNull() ?: 1f).coerceIn(0f, 3f)
-        val saturation = ((values["$key.saturation"] ?: values["IMAGE.saturation"])?.toFloatOrNull() ?: 1f).coerceIn(0f, 3f)
-        val tint = runCatching {
-            Color(android.graphics.Color.parseColor(values["$key.tint"] ?: values["IMAGE.tint"] ?: "#FFFFFFFF"))
-        }.getOrDefault(Color.White)
-        val offset = 0.5f * (1f - contrast) + brightness
-        val colorMatrix = ColorMatrix(floatArrayOf(
-            contrast * (0.213f + 0.787f * saturation) * tint.red, contrast * (0.715f - 0.715f * saturation) * tint.red, contrast * (0.072f - 0.072f * saturation) * tint.red, 0f, offset * tint.red,
-            contrast * (0.213f - 0.213f * saturation) * tint.green, contrast * (0.715f + 0.285f * saturation) * tint.green, contrast * (0.072f - 0.072f * saturation) * tint.green, 0f, offset * tint.green,
-            contrast * (0.213f - 0.213f * saturation) * tint.blue, contrast * (0.715f - 0.715f * saturation) * tint.blue, contrast * (0.072f + 0.928f * saturation) * tint.blue, 0f, offset * tint.blue,
-            0f, 0f, 0f, tint.alpha, 0f
-        ))
         val keepAspect = (values["$key.keepAspect"] ?: values["IMAGE.keepAspect"] ?: "true").toBooleanStrictOrNull() != false
         val cropToFit = (values["$key.cropToFit"] ?: values["IMAGE.cropToFit"] ?: "false").toBooleanStrictOrNull() == true
         val imageShapeName = values["$key.shape"] ?: values["IMAGE.shape"] ?: "Rectangle"
@@ -1169,13 +1190,104 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
             contentAlignment = Alignment.Center
         ) {
             Image(
-                bitmap = bitmap!!.asImageBitmap(),
+                bitmap = bitmap.asImageBitmap(),
                 contentDescription = layer.name,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = imageContentScale,
-                colorFilter = ColorFilter.colorMatrix(colorMatrix)
             )
         }
+    }
+}
+
+
+private fun transformImageBitmap(
+    source: android.graphics.Bitmap,
+    mask: android.graphics.Bitmap?,
+    enableColorKey: Boolean,
+    keyColorText: String,
+    threshold: Float,
+    softness: Float,
+    hueShift: Float,
+    brightness: Float,
+    contrast: Float,
+    saturation: Float,
+    tintText: String,
+    maskMode: String
+): android.graphics.Bitmap {
+    val maxDimension = 1600
+    val scale = minOf(1f, maxDimension.toFloat() / maxOf(source.width, source.height))
+    val width = (source.width * scale).toInt().coerceAtLeast(1)
+    val height = (source.height * scale).toInt().coerceAtLeast(1)
+    val input = if (width != source.width || height != source.height) {
+        android.graphics.Bitmap.createScaledBitmap(source, width, height, true)
+    } else source
+    val maskScaled = mask?.let {
+        if (it.width != width || it.height != height) android.graphics.Bitmap.createScaledBitmap(it, width, height, true) else it
+    }
+    val pixels = IntArray(width * height)
+    input.getPixels(pixels, 0, width, 0, 0, width, height)
+    val maskPixels = maskScaled?.let { IntArray(width * height).also { array -> it.getPixels(array, 0, width, 0, 0, width, height) } }
+    val keyColor = runCatching { android.graphics.Color.parseColor(keyColorText) }.getOrDefault(android.graphics.Color.GREEN)
+    val keyR = android.graphics.Color.red(keyColor).toFloat()
+    val keyG = android.graphics.Color.green(keyColor).toFloat()
+    val keyB = android.graphics.Color.blue(keyColor).toFloat()
+    val tint = runCatching { android.graphics.Color.parseColor(tintText) }.getOrDefault(android.graphics.Color.WHITE)
+    val tintR = android.graphics.Color.red(tint) / 255f
+    val tintG = android.graphics.Color.green(tint) / 255f
+    val tintB = android.graphics.Color.blue(tint) / 255f
+    val tintA = android.graphics.Color.alpha(tint) / 255f
+    val hsv = FloatArray(3)
+    val keyLimit = threshold * 441.673f
+    val softLimit = (softness * 441.673f).coerceAtLeast(0.001f)
+    for (index in pixels.indices) {
+        val pixel = pixels[index]
+        var alpha = android.graphics.Color.alpha(pixel).toFloat()
+        var red = android.graphics.Color.red(pixel).toFloat()
+        var green = android.graphics.Color.green(pixel).toFloat()
+        var blue = android.graphics.Color.blue(pixel).toFloat()
+
+        if (enableColorKey) {
+            val dr = red - keyR
+            val dg = green - keyG
+            val db = blue - keyB
+            val distance = kotlin.math.sqrt(dr * dr + dg * dg + db * db)
+            val keyAlpha = if (distance <= keyLimit) 0f else ((distance - keyLimit) / softLimit).coerceIn(0f, 1f)
+            alpha *= keyAlpha
+        }
+        if (maskPixels != null) {
+            val maskPixel = maskPixels[index]
+            val maskFactor = when (maskMode) {
+                "Luminance" -> {
+                    val mr = android.graphics.Color.red(maskPixel)
+                    val mg = android.graphics.Color.green(maskPixel)
+                    val mb = android.graphics.Color.blue(maskPixel)
+                    (0.2126f * mr + 0.7152f * mg + 0.0722f * mb) / 255f
+                }
+                "Inverted Alpha" -> 1f - android.graphics.Color.alpha(maskPixel) / 255f
+                else -> android.graphics.Color.alpha(maskPixel) / 255f
+            }
+            alpha *= maskFactor
+        }
+        if (hueShift != 0f || saturation != 1f) {
+            android.graphics.Color.RGBToHSV(red.toInt(), green.toInt(), blue.toInt(), hsv)
+            hsv[0] = (hsv[0] + hueShift + 360f) % 360f
+            hsv[1] = (hsv[1] * saturation).coerceIn(0f, 1f)
+            val adjusted = android.graphics.Color.HSVToColor(hsv)
+            red = android.graphics.Color.red(adjusted).toFloat()
+            green = android.graphics.Color.green(adjusted).toFloat()
+            blue = android.graphics.Color.blue(adjusted).toFloat()
+        }
+        fun adjust(channel: Float, tintFactor: Float): Int {
+            val contrasted = ((channel / 255f - 0.5f + brightness) * contrast + 0.5f).coerceIn(0f, 1f)
+            return (contrasted * tintFactor * 255f).toInt().coerceIn(0, 255)
+        }
+        pixels[index] = android.graphics.Color.argb(
+            (alpha * tintA).toInt().coerceIn(0, 255),
+            adjust(red, tintR), adjust(green, tintG), adjust(blue, tintB)
+        )
+    }
+    return android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888).also {
+        it.setPixels(pixels, 0, width, 0, 0, width, height)
     }
 }
 
