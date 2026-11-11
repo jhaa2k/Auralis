@@ -140,7 +140,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     var playbackDuration by remember { mutableLongStateOf(0L) }
     var audioStatus by remember { mutableStateOf("PLAYER READY") }
     var previewAspectRatio by remember { mutableStateOf("16:9") }
-    var expandedGroup by remember(selectedModuleId) { mutableStateOf<String?>("General") }
+    var expandedGroup by remember(selectedLayer.type) { mutableStateOf<String?>(module.groups.firstOrNull()?.title) }
     var showModuleInfo by remember { mutableStateOf(false) }
 
     var exportResolution by remember { mutableStateOf("1080p") }
