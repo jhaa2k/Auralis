@@ -285,7 +285,17 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             MeasureWhat.BEAT_CAM_SHAKE_ROT_LESS -> 0.5f - beat * 0.5f
             MeasureWhat.CONSTANT_SHAKE_ROT_MORE -> 0.5f + sin(phase * 19f) * 0.5f
             MeasureWhat.CONSTANT_SHAKE_ROT_LESS -> 0.5f - sin(phase * 19f) * 0.5f
-            MeasureWhat.BEAT_TRIGGER_ANIM -> 0.5f + beat * 0.5f
+            MeasureWhat.BEAT_TRIGGER_ANIM, MeasureWhat.BEAT_CAM_SHAKE_ONLY,
+            MeasureWhat.BEAT_PULSE_SCALE, MeasureWhat.BEAT_FLASH_COLOR,
+            MeasureWhat.BEAT_GLOW_INTENSITY, MeasureWhat.BEAT_HORIZONTAL_STRETCH,
+            MeasureWhat.BEAT_VERTICAL_BOUNCE -> 0.5f + beat * 0.5f
+            MeasureWhat.CONSTANT_SLOW_ROTATE -> (elapsed * 0.08f) % 1f
+            MeasureWhat.CONSTANT_ORBIT_MOVE -> 0.5f + sin(elapsed * 0.35f) * 0.5f
+            MeasureWhat.CONSTANT_LINEAR_SCROLL -> (elapsed * 0.12f) % 1f
+            MeasureWhat.TRACK_PROGRESS_PERCENTAGE -> trackPosition
+            MeasureWhat.TRACK_REMAINING_TIME -> 1f - trackPosition
+            MeasureWhat.TRACK_INTRO_OUTRO_TRIGGER -> if (trackPosition < 0.08f || trackPosition > 0.92f) 0.5f + beat * 0.5f else 0.5f
+            MeasureWhat.VOLUME_LEVEL_RESPONSIVE, MeasureWhat.PITCH_FREQUENCY_RESPONSIVE -> energy
         }.coerceIn(0f, 1f)
     }
 
