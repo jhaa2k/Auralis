@@ -121,6 +121,7 @@ fun AuralisApp() {
     var exportFps by remember { mutableFloatStateOf(0.2f) }
     val editorLayers = remember { mutableStateListOf(EditorLayer(1, "Composition", "Main Composition"), EditorLayer(2, "Bars", "Spectrum Bars")) }
     var selectedLayerId by remember { mutableIntStateOf(2) }
+    var selectedPropertyCategory by remember { mutableStateOf("GENERAL") }
     var nextLayerId by remember { mutableIntStateOf(3) }
     var addLayerMenuExpanded by remember { mutableStateOf(false) }
     var fftLower by remember { mutableFloatStateOf(0.02f) }
@@ -562,59 +563,106 @@ fun AuralisApp() {
                             if (selectedIndex >= 0) {
                                 val selected = editorLayers[selectedIndex]
                                 Text("PROPERTIES / ${selected.name.uppercase(Locale.US)}", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                PropertySlider("Opacity", selected.opacity, { editorLayers[selectedIndex] = selected.copy(opacity = it) }, "0%", "100%", "${(selected.opacity * 100).toInt()}%", resetValue = 1f)
-                                PropertySlider("Position X", selected.x, { editorLayers[selectedIndex] = selected.copy(x = it) }, "LEFT", "RIGHT", "${(selected.x * 100).toInt()}%", resetValue = 0.5f)
-                                PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%", resetValue = 0.5f)
-                                PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale), resetValue = (1f - 0.1f) / 2.9f)
-                                PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°", resetValue = 0.5f)
-                                if (selected.type == "Bars" || selected.type == "Particles") {
-                                    Text("AUDIO / TIME MODULATION", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                    MeasureDropdown("Position · Measure What", selected.positionMeasure) { editorLayers[selectedIndex] = selected.copy(positionMeasure = it) }
-                                    MeasureDropdown("Scale · Measure What", selected.scaleMeasure) { editorLayers[selectedIndex] = selected.copy(scaleMeasure = it) }
-                                    MeasureDropdown("Rotation · Measure What", selected.rotationMeasure) { editorLayers[selectedIndex] = selected.copy(rotationMeasure = it) }
-                                    PropertySlider("Measure amount", selected.measureAmount, { editorLayers[selectedIndex] = selected.copy(measureAmount = it) }, "SUBTLE", "STRONG", "${(selected.measureAmount * 100).toInt()}%", resetValue = 0.5f)
-                                    PropertyInfoRow("Beat detection", "Bass FFT onset / live")
+                                val propertyCategories = listOf("GENERAL", "COLOR", "ADJUSTMENT", "BEHAVIOUR", "AUDIO / MEASURE", "ADVANCED")
+                                propertyCategories.chunked(3).forEach { categoryRow ->
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        categoryRow.forEach { category ->
+                                            Button(
+                                                onClick = { selectedPropertyCategory = category },
+                                                modifier = Modifier.weight(1f).height(28.dp),
+                                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 3.dp, vertical = 0.dp),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (selectedPropertyCategory == category) StudioAccent else StudioPanel,
+                                                    contentColor = if (selectedPropertyCategory == category) StudioBlack else StudioMuted
+                                                ),
+                                                shape = RoundedCornerShape(2.dp)
+                                            ) { Text(category, fontSize = 7.sp, fontWeight = FontWeight.Bold, maxLines = 1) }
+                                        }
+                                    }
                                 }
-                                if (selected.type == "Bars") {
-                                    Text("BAR GEOMETRY", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                    PropertySlider("Bar width", barWidth, { barWidth = it }, "THIN", "WIDE", "${(15 + barWidth * 85).toInt()}%", resetValue = 0.67f)
-                                    PropertySlider("Bar height", barHeight, { barHeight = it }, "SHORT", "TALL", "${(10 + barHeight * 190).toInt()}%", resetValue = 0.47f)
-                                    PropertySlider("Segments per bar", segmentCountValue, { segmentCountValue = it }, "1", "32", "${1 + (segmentCountValue * 31f).toInt()}", resetValue = 0f)
-                                    PropertySlider("Segment spacing", segmentGapValue, { segmentGapValue = it }, "TIGHT", "WIDE", "${(segmentGapValue * 45).toInt()}%", resetValue = 0.40f)
-                                    PropertyInfoRow("Geometry", "Width, height, segment count and spacing")
-                                }
-                                if (selected.type == "Particles") {
-                                    PropertySlider("Particle count", particleCount, { particleCount = it }, "20", "400", "${(20 + particleCount * 380).toInt()}", resetValue = 0.30f)
-                                    PropertySlider("Movement speed", particleSpeed, { particleSpeed = it }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", 0.1f + particleSpeed * 3.9f), resetValue = 0.35f)
-                                    PropertySlider("Particle size", particleSize, { particleSize = it }, "1 PX", "12 PX", "${(1f + particleSize * 11f).toInt()} px", resetValue = 0.25f)
-                                    PropertySlider("Spread", particleSpread, { particleSpread = it }, "NARROW", "WIDE", "${((0.1f + particleSpread * 1.9f) * 100).toInt()}%", resetValue = 0.40f)
-                                    PropertyInfoRow("Renderer", "OpenGL ES / animated points")
-                                    PropertyInfoRow("Audio response", "Live FFT energy modulation")
-                                }
-                                if (selected.type == "RGB Split") {
-                                    PropertySlider("Channel separation", selected.rgbSplitAmount, { editorLayers[selectedIndex] = selected.copy(rgbSplitAmount = it) }, "0 PX", "MAX", "${(selected.rgbSplitAmount * 100).toInt()}%", resetValue = 0f)
-                                    PropertyInfoRow("GPU renderer", "OpenGL RGB channel offsets")
-                                    PropertyInfoRow("Effect scope", "Spectrum geometry only")
-                                }
-                                if (selected.type == "Image") {
-                                    Button(
-                                        onClick = { imagePicker.launch(arrayOf("image/*")) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack),
-                                        shape = RoundedCornerShape(2.dp)
-                                    ) { Text(if (selected.imageUri == null) "CHOOSE IMAGE" else "REPLACE IMAGE", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                                    PropertyInfoRow("Image source", if (selected.imageUri == null) "No image selected" else "Device image / loaded")
-                                    Text("Image is rendered in the live preview with layer transforms.", color = StudioMuted, fontSize = 8.sp)
-                                }
-                                if (selected.type == "Text") {
-                                    Text("TEXT CONTENT", color = StudioMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                    BasicTextField(
-                                        value = selected.textContent,
-                                        onValueChange = { editorLayers[selectedIndex] = selected.copy(textContent = it) },
-                                        textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 11.sp),
-                                        modifier = Modifier.fillMaxWidth().background(StudioBlack, RoundedCornerShape(2.dp)).padding(8.dp)
-                                    )
-                                    PropertySlider("Font size", ((selected.fontSize - 8f) / 88f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(fontSize = 8f + it * 88f) }, "8 SP", "96 SP", "${selected.fontSize.toInt()} sp", resetValue = 0.25f)
-                                    PropertyInfoRow("Text renderer", "Compose overlay / active")
+                                when (selectedPropertyCategory) {
+                                    "GENERAL" -> {
+                                        PropertySlider("Opacity", selected.opacity, { editorLayers[selectedIndex] = selected.copy(opacity = it) }, "0%", "100%", "${(selected.opacity * 100).toInt()}%", resetValue = 1f)
+                                        PropertySlider("Position X", selected.x, { editorLayers[selectedIndex] = selected.copy(x = it) }, "LEFT", "RIGHT", "${(selected.x * 100).toInt()}%", resetValue = 0.5f)
+                                        PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%", resetValue = 0.5f)
+                                        PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale), resetValue = (1f - 0.1f) / 2.9f)
+                                        PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°", resetValue = 0.5f)
+                                        if (selected.type == "Text") {
+                                            Text("TEXT CONTENT", color = StudioMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                            BasicTextField(value = selected.textContent, onValueChange = { editorLayers[selectedIndex] = selected.copy(textContent = it) }, textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 11.sp), modifier = Modifier.fillMaxWidth().background(StudioBlack, RoundedCornerShape(2.dp)).padding(8.dp))
+                                            PropertySlider("Font size", ((selected.fontSize - 8f) / 88f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(fontSize = 8f + it * 88f) }, "8 SP", "96 SP", "${selected.fontSize.toInt()} sp", resetValue = 0.25f)
+                                        }
+                                        if (selected.type == "Image") {
+                                            Button(onClick = { imagePicker.launch(arrayOf("image/*")) }, colors = ButtonDefaults.buttonColors(containerColor = StudioAccent, contentColor = StudioBlack), shape = RoundedCornerShape(2.dp)) { Text(if (selected.imageUri == null) "CHOOSE IMAGE" else "REPLACE IMAGE", fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                                            PropertyInfoRow("Image source", if (selected.imageUri == null) "No image selected" else "Device image / loaded")
+                                            PropertyInfoRow("Aspect handling", "Fit / preserve source ratio")
+                                        }
+                                    }
+                                    "COLOR" -> {
+                                        Text("TEXT COLOR PRESETS", color = StudioMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        if (selected.type == "Text") {
+                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                listOf(0xFFFFFFFF, 0xFFFF8A5B, 0xFF59D6FF, 0xFFB58CFF, 0xFF70E0A0, 0xFFFFD166).forEach { argb ->
+                                                    val swatch = Color(argb)
+                                                    Surface(
+                                                        modifier = Modifier.size(28.dp),
+                                                        color = swatch,
+                                                        shape = RoundedCornerShape(2.dp),
+                                                        border = BorderStroke(if (selected.textColor == argb) 2.dp else 1.dp, if (selected.textColor == argb) StudioAccent else StudioMuted),
+                                                        onClick = { editorLayers[selectedIndex] = selected.copy(textColor = argb) }
+                                                    ) {}
+                                                }
+                                            }
+                                            PropertyInfoRow("Color target", "Selected text layer")
+                                        } else {
+                                            PropertyInfoRow("Color controls", "This layer type is not color-mapped yet")
+                                            PropertyInfoRow("Status", "Palette controls will activate with its renderer")
+                                        }
+                                    }
+                                    "ADJUSTMENT" -> {
+                                        if (selected.type == "Bars") {
+                                            PropertySlider("Bar width", barWidth, { barWidth = it }, "THIN", "WIDE", "${(15 + barWidth * 85).toInt()}%", resetValue = 0.67f)
+                                            PropertySlider("Bar height", barHeight, { barHeight = it }, "SHORT", "TALL", "${(10 + barHeight * 190).toInt()}%", resetValue = 0.47f)
+                                            PropertySlider("Segments per bar", segmentCountValue, { segmentCountValue = it }, "1", "32", "${1 + (segmentCountValue * 31f).toInt()}", resetValue = 0f)
+                                            PropertySlider("Segment spacing", segmentGapValue, { segmentGapValue = it }, "TIGHT", "WIDE", "${(segmentGapValue * 45).toInt()}%", resetValue = 0.40f)
+                                        } else if (selected.type == "Particles") {
+                                            PropertySlider("Particle count", particleCount, { particleCount = it }, "20", "400", "${(20 + particleCount * 380).toInt()}", resetValue = 0.30f)
+                                            PropertySlider("Movement speed", particleSpeed, { particleSpeed = it }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", 0.1f + particleSpeed * 3.9f), resetValue = 0.35f)
+                                            PropertySlider("Particle size", particleSize, { particleSize = it }, "1 PX", "12 PX", "${(1f + particleSize * 11f).toInt()} px", resetValue = 0.25f)
+                                            PropertySlider("Spread", particleSpread, { particleSpread = it }, "NARROW", "WIDE", "${((0.1f + particleSpread * 1.9f) * 100).toInt()}%", resetValue = 0.40f)
+                                        } else if (selected.type == "RGB Split") {
+                                            PropertySlider("Channel separation", selected.rgbSplitAmount, { editorLayers[selectedIndex] = selected.copy(rgbSplitAmount = it) }, "0 PX", "MAX", "${(selected.rgbSplitAmount * 100).toInt()}%", resetValue = 0f)
+                                            PropertyInfoRow("Effect scope", "Spectrum geometry only")
+                                        } else {
+                                            PropertyInfoRow("Adjustment controls", "No type-specific adjustments available")
+                                        }
+                                    }
+                                    "BEHAVIOUR" -> {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Checkbox(checked = selected.visible, onCheckedChange = { editorLayers[selectedIndex] = selected.copy(visible = it) })
+                                            Text("Layer visible", color = StudioWhite, fontSize = 9.sp)
+                                        }
+                                        PropertyInfoRow("Layer behaviour", "Visibility and transform are active")
+                                        if (selected.type == "Particles") PropertyInfoRow("Motion", "Procedural movement / live FFT energy")
+                                        if (selected.type == "Image") PropertyInfoRow("Aspect ratio", "Fit without stretching")
+                                    }
+                                    "AUDIO / MEASURE" -> {
+                                        if (selected.type == "Bars" || selected.type == "Particles") {
+                                            MeasureDropdown("Position · Measure What", selected.positionMeasure) { editorLayers[selectedIndex] = selected.copy(positionMeasure = it) }
+                                            MeasureDropdown("Scale · Measure What", selected.scaleMeasure) { editorLayers[selectedIndex] = selected.copy(scaleMeasure = it) }
+                                            MeasureDropdown("Rotation · Measure What", selected.rotationMeasure) { editorLayers[selectedIndex] = selected.copy(rotationMeasure = it) }
+                                            PropertySlider("Measure amount", selected.measureAmount, { editorLayers[selectedIndex] = selected.copy(measureAmount = it) }, "SUBTLE", "STRONG", "${(selected.measureAmount * 100).toInt()}%", resetValue = 0.5f)
+                                            PropertyInfoRow("Beat detector", "Bass FFT onset / live")
+                                        } else {
+                                            PropertyInfoRow("Audio modulation", "Not connected for this layer type")
+                                        }
+                                    }
+                                    else -> {
+                                        PropertyInfoRow("Layer type", selected.type)
+                                        PropertyInfoRow("Preview", if (selected.type == "Text" || selected.type == "Image" || selected.type == "Bars" || selected.type == "Particles") "Implemented for this layer" else "Not implemented")
+                                        PropertyInfoRow("Export compositor", "Full layer export is still pending")
+                                        PropertyInfoRow("Advanced schema", "Typed Avee-style property models are in the project")
+                                    }
                                 }
                                 Text("Text, image and particle layers render in preview. Other effects remain pending.", color = StudioMuted, fontSize = 8.sp)
                             }
