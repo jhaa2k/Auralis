@@ -15,14 +15,17 @@ object ModuleCatalog {
     val fullBlend = blendModes
     private fun defaultRange(key: String): Pair<Float, Float> = when (key) {
         "positionX", "positionY", "alignmentX", "alignmentY", "pivotX", "pivotY" -> 0f to 1f
-        "scaleX", "scaleY", "particleScale" -> 0.1f to 4f
+        "scaleX", "scaleY" -> 0.1f to 3f
+        "particleScale" -> 0.1f to 4f
         "alpha", "opacity", "opacityStrength", "threshold", "softness", "colorBlendOffset",
-        "barSpacing", "blurAmount", "splitAmount", "relativeMotion" -> 0f to 1f
-        "barCount" -> 16f to 512f
+        "barSpacing" -> 0f to 0.45f
+        "blurAmount", "splitAmount", "relativeMotion" -> 0f to 1f
+        "barCount" -> 16f to 128f
         "barWidth" -> 0.05f to 1f
         "heightScale", "maxHeightScale" -> 0f to 4f
         "minHeightScale" -> 0f to 1f
-        "rotation", "angle", "vectorAngle", "vectorAngleZ" -> 0f to 360f
+        "rotation" -> -180f to 180f
+        "angle", "vectorAngle", "vectorAngleZ" -> 0f to 360f
         "fixedHeight", "segment1FixedHeight", "segment2FixedHeight", "segment3FixedHeight" -> 0f to 4f
         "segment1HeightMultiplier", "segment2HeightMultiplier", "segment3HeightMultiplier" -> 0f to 5f
         "reactionDelay", "reactionAccumulatedDelay" -> 0f to 1000f
@@ -32,7 +35,7 @@ object ModuleCatalog {
         "trailLength" -> 0f to 50f
         "fadeInOut", "fadeInOutTime" -> 0f to 10f
         "sizeAspectRatio" -> 0.1f to 5f
-        "startSize", "fadeInSize", "endSize", "endSizeRandom" -> 0f to 100f
+        "startSize", "fadeInSize", "endSize", "endSizeRandom" -> 0f to 64f
         "endSizeZFactor" -> 0f to 10f
         "nearCameraFade" -> 0f to 1000f
         "spawnTime" -> 0f to 10f
@@ -80,7 +83,7 @@ object ModuleCatalog {
         s("positionX","Position X"),s("positionY","Position Y"),
         s("anchorX","Anchor X",SettingKind.DROPDOWN,options=anchors,default="center"),s("anchorY","Anchor Y",SettingKind.DROPDOWN,options=anchors,default="center"),
         s("alignmentX","Alignment Position X"),s("alignmentY","Alignment Position Y"),
-        s("uniformScale","Scale Is Uniform",SettingKind.CHECKBOX,default="true"),s("scaleX","Scale X"),s("scaleY","Scale Y"),s("rotation","Rotation",max=360f),s("pivotX","Pivot X"),s("pivotY","Pivot Y"),
+        s("uniformScale","Scale Is Uniform",SettingKind.CHECKBOX,default="true"),s("scaleX","Scale X"),s("scaleY","Scale Y"),s("rotation","Rotation",min=-180f,max=180f),s("pivotX","Pivot X"),s("pivotY","Pivot Y"),
         s("measurePos","Measure Pos",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureScale","Measure Scale",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureRot","Measure Rot",SettingKind.DROPDOWN,options=measures,default="Nothing")
     ))
     private fun group(title:String,vararg fields:SettingSpec)=SettingGroup(title,fields.toList())
@@ -93,9 +96,9 @@ object ModuleCatalog {
                 general(),
                 group("Bars Setup",
                     s("flipInput","Flip Input",SettingKind.CHECKBOX),
-                    s("heightScale","Height Scale"), s("minHeightScale","Min Height Scale"),
+                    s("heightScale","Height Scale",max=2f), s("minHeightScale","Min Height Scale"),
                     s("maxHeightScale","Max Height Scale"), s("shapePath","Shape Path",SettingKind.DROPDOWN,options=shapes),
-                    s("colorBlendOffset","Color Blend Offset"), s("barCount","Bar Count",max=512f,default="64"),
+                    s("colorBlendOffset","Color Blend Offset"), s("barCount","Bar Count",max=128f,default="64"),
                     s("barSpacing","Bar Spacing"), s("barWidth","Bar Width")
                 )
             ) + (1..3).map { n ->
