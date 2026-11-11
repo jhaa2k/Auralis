@@ -220,6 +220,7 @@ object VisualizerVideoExporter {
             val time = System.nanoTime() / 1_000_000_000.0
             val energy = bands.average().toFloat().coerceIn(0f, 1f)
             val beatPulse = ((energy - previousEnergy) * 4f).coerceIn(0f, 1f)
+            if (beatPulse > 0.12f) lastBeatTimestamp = time
             previousEnergy = previousEnergy * .72f + energy * .28f
             fun measureValue(name: String, elapsed: Float, currentEnergy: Float, beat: Float, trackPosition: Float): Float {
                 val phase = elapsed * .7f
@@ -526,7 +527,7 @@ object VisualizerVideoExporter {
             buf.position(2)
             GLES20.glVertexAttribPointer(col,4,GLES20.GL_FLOAT,false,24,buf)
             val rgb = configs.firstOrNull { it.rgbSplitAmount > 0f }
-            val rgbActive = rgb != null && (!rgb.rgbSplitOnBeat || bands.average().toFloat() > 0.15f)
+            val rgbActive = rgb != null && (!rgb.rgbSplitOnBeat || time - lastBeatTimestamp <= rgb.rgbGlitchDurationMs / 1000.0)
             if (rgbActive && rgb != null) {
                 val shift = 0.002f + rgb.rgbSplitAmount * 0.028f
                 val angle = Math.toRadians(rgb.rgbSplitAngle.toDouble())
