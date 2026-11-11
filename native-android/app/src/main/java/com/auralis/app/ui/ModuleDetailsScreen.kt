@@ -1,6 +1,10 @@
 package com.auralis.app.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
@@ -153,6 +157,40 @@ private val modules: Map<String,ModuleSpec> = listOf(
     ))))
 ).associateBy { it.title }
 
+@Composable
+private fun ThinModuleSlider(
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val range = (valueRange.endInclusive - valueRange.start).coerceAtLeast(0.0001f)
+    val fraction = ((value - valueRange.start) / range).coerceIn(0f, 1f)
+    Canvas(
+        modifier = modifier
+            .height(22.dp)
+            .pointerInput(valueRange) {
+                detectTapGestures { point ->
+                    onValueChange(valueRange.start + (point.x / size.width).coerceIn(0f, 1f) * range)
+                }
+            }
+            .pointerInput(valueRange) {
+                detectDragGestures { change, _ ->
+                    change.consume()
+                    onValueChange(valueRange.start + (change.position.x / size.width).coerceIn(0f, 1f) * range)
+                }
+            }
+    ) {
+        val inset = 5.dp.toPx()
+        val centerY = size.height / 2f
+        val end = size.width - inset
+        val thumbX = inset + (end - inset) * fraction
+        drawLine(StudioLine, Offset(inset, centerY), Offset(end, centerY), strokeWidth = 2.5.dp.toPx())
+        drawLine(StudioAccent, Offset(inset, centerY), Offset(thumbX, centerY), strokeWidth = 2.5.dp.toPx())
+        drawCircle(StudioAccent, 4.5.dp.toPx(), Offset(thumbX, centerY))
+    }
+}
+
 /** Full-screen details editor. All sections start collapsed; only one category can be expanded at a time. Each layer owns values through the stable layerId.key namespace. */
 @Composable
 internal fun ModuleDetailsScreen(
@@ -232,7 +270,12 @@ internal fun ModuleDetailsScreen(
                                                     else -> maxOf(1f, (field.defaultValue.toFloatOrNull() ?: 1f) * 2f)
                                                 }
                                                 Row(verticalAlignment=Alignment.CenterVertically) {
-                                                    Slider(value=numeric.coerceIn(0f,maxValue),onValueChange={write(group,field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..maxValue,modifier=Modifier.weight(1f).height(22.dp),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
+                                                    ThinModuleSlider(
+                                                        value = numeric.coerceIn(0f, maxValue),
+                                                        valueRange = 0f..maxValue,
+                                                        onValueChange = { write(group, field, String.format(Locale.US, "%.3f", it)) },
+                                                        modifier = Modifier.weight(1f)
+                                                    )
                                                     Text(value,color=StudioAccent,fontSize=9.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.width(58.dp))
                                                 }
                                             }
