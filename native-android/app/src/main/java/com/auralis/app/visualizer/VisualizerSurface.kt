@@ -134,6 +134,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         if (program == 0) return
         val configs = settings
         val beatConfig = configs.firstOrNull() ?: VisualizerSettings(barsEnabled = false)
+        val background = beatConfig.backgroundColor
+        GLES20.glClearColor(((background shr 16) and 0xFF).toFloat() / 255f, ((background shr 8) and 0xFF).toFloat() / 255f, (background and 0xFF).toFloat() / 255f, ((background shr 24) and 0xFF).toFloat() / 255f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         val data = spectrum
         val nowNanos = System.nanoTime()
         val elapsedSeconds = ((nowNanos - rendererStartNanos) / 1_000_000_000.0).toFloat()
