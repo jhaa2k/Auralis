@@ -315,7 +315,10 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             }.coerceAtLeast(1),
             sensitivity = barSetting("maxHeightScale", "1").toFloatOrNull()
                 ?.coerceIn(0.1f, 4f) ?: 1f,
-            particlesEnabled = values["$layerSettingsKey.visible"]?.toBoolean() ?: values["PARTICLES.visible"]?.toBoolean() ?: false
+            particlesEnabled = selectedLayer.type == "PARTICLES" &&
+                (values["$layerSettingsKey.visible"]?.toBooleanStrictOrNull() ?: true),
+            barsEnabled = selectedLayer.type == "BARS" &&
+                (values["$layerSettingsKey.visible"]?.toBooleanStrictOrNull() ?: true)
         ).sanitized()
     }
     SideEffect { previewSurface?.updateSettings(liveSettings) }
@@ -350,7 +353,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 },
                 actions = {
                     if (selectedTab == EditorTab.STUDIO) {
-                        IconButton(onClick = { store.reset(module.id, module.groups) }) {
+                        IconButton(onClick = { store.reset(layerSettingsKey, module.groups) }) {
                             Icon(
                                 Icons.Outlined.Refresh,
                                 contentDescription = "Reset selected module",
@@ -1362,6 +1365,23 @@ private fun SettingControl(
     value: String,
     onValueChange: (String) -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            onValueChange(uri.toString())
+        }
+    }
+    val fontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            onValueChange(uri.toString())
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1463,18 +1483,19 @@ private fun SettingControl(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     supportingText = {
-                        Text("RGBA hex · #RRGGBBAA", fontSize = 8.sp)
+                        Text("ARGB hex · #AARRGGBB", fontSize = 8.sp)
                     },
                     leadingIcon = {
                         val parsed = remember(value) {
                             runCatching {
                                 val hex = value.removePrefix("#")
                                 if (hex.length == 8) {
+                                    // Catalog defaults use Android ARGB notation: #AARRGGBB.
                                     Color(
-                                        red = hex.substring(0, 2).toInt(16) / 255f,
-                                        green = hex.substring(2, 4).toInt(16) / 255f,
-                                        blue = hex.substring(4, 6).toInt(16) / 255f,
-                                        alpha = hex.substring(6, 8).toInt(16) / 255f
+                                        alpha = hex.substring(0, 2).toInt(16) / 255f,
+                                        red = hex.substring(2, 4).toInt(16) / 255f,
+                                        green = hex.substring(4, 6).toInt(16) / 255f,
+                                        blue = hex.substring(6, 8).toInt(16) / 255f
                                     )
                                 } else {
                                     Color.Transparent
@@ -1494,28 +1515,28 @@ private fun SettingControl(
             SettingKind.IMAGE_PICKER -> {
                 Text(spec.label, color = EditorText, fontSize = 10.sp)
                 OutlinedButton(
-                    onClick = { },
+                    onClick = { imagePicker.launch(arrayOf("image/*")) },
                     modifier = Modifier.fillMaxWidth().height(37.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     border = BorderStroke(1.dp, EditorLine),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorText),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text(if (value.isBlank()) "CHOOSE IMAGE" else value.substringAfterLast('/'), fontSize = 9.sp)
+                    Text(if (value.isBlank()) "CHOOSE IMAGE" else value.substringAfterLast('/').take(42), fontSize = 9.sp)
                 }
             }
 
             SettingKind.FONT_PICKER -> {
                 Text(spec.label, color = EditorText, fontSize = 10.sp)
                 OutlinedButton(
-                    onClick = { },
+                    onClick = { fontPicker.launch(arrayOf("font/*", "application/octet-stream")) },
                     modifier = Modifier.fillMaxWidth().height(37.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     border = BorderStroke(1.dp, EditorLine),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorText),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text(value.ifBlank { "CHOOSE FONT" }, fontSize = 9.sp)
+                    Text(value.substringAfterLast('/').ifBlank { "CHOOSE FONT" }, fontSize = 9.sp)
                 }
             }
 
@@ -1572,10 +1593,13 @@ private fun ThinValueSlider(
     val minValue = valueRange.start
     val maxValue = valueRange.endInclusive
     val currentValue = value.coerceIn(minValue, maxValue)
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val insetPx = with(density) { 5.dp.toPx() }
 
     fun updateFromX(x: Float, width: Int) {
-        if (width <= 0 || maxValue <= minValue) return
-        val fraction = (x / width.toFloat()).coerceIn(0f, 1f)
+        val usableWidth = width.toFloat() - insetPx * 2f
+        if (usableWidth <= 0f || maxValue <= minValue) return
+        val fraction = ((x - insetPx) / usableWidth).coerceIn(0f, 1f)
         onValueChange(minValue + (maxValue - minValue) * fraction)
     }
 
@@ -1583,13 +1607,16 @@ private fun ThinValueSlider(
         modifier = Modifier
             .fillMaxWidth()
             .height(27.dp)
-            .pointerInput(enabled, minValue, maxValue) {
+            .pointerInput(enabled, minValue, maxValue, insetPx) {
                 if (enabled) detectTapGestures { updateFromX(it.x, size.width) }
             }
-            .pointerInput(enabled, minValue, maxValue) {
+            .pointerInput(enabled, minValue, maxValue, insetPx) {
                 if (enabled) detectDragGestures(
                     onDragStart = { updateFromX(it.x, size.width) },
-                    onDrag = { change, _ -> updateFromX(change.position.x, size.width) }
+                    onDrag = { change, _ ->
+                        updateFromX(change.position.x, size.width)
+                        change.consume()
+                    }
                 )
             }
     ) {
