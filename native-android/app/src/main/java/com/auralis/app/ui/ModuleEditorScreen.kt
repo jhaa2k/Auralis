@@ -1,12 +1,13 @@
 package com.auralis.app.ui
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
-import android.net.Uri
-import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -14,9 +15,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AudioFile
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Refresh
@@ -26,315 +29,858 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.auralis.app.audio.AudioSessionBridge
+import com.auralis.app.export.VideoExportConfig
+import com.auralis.app.export.VisualizerVideoExporter
 import com.auralis.app.playback.AuralisPlaybackService
 import com.auralis.app.visualizer.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private val EditorBackground = Color(0xFF101116)
 private val EditorPanel = Color(0xFF181A21)
+private val EditorRaised = Color(0xFF20232D)
 private val EditorLine = Color(0xFF2B2E38)
 private val EditorText = Color(0xFFF2F3F7)
 private val EditorMuted = Color(0xFF9298A6)
 private val EditorAccent = Color(0xFFFF9A6B)
+private val EditorSuccess = Color(0xFF75C99B)
+
+private enum class EditorTab(val label: String, val icon: ImageVector) {
+    STUDIO("Studio", Icons.Outlined.GraphicEq),
+    ELEMENTS("Elements", Icons.Outlined.Layers),
+    AUDIO("Audio", Icons.Outlined.AudioFile),
+    EXPORT("Export", Icons.Outlined.FileDownload)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var selectedModuleId by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    var selectedTab by remember { mutableStateOf(EditorTab.STUDIO) }
+    var selectedModuleId by remember { mutableStateOf("BARS") }
     val values by store.values.collectAsState()
     val module = ModuleCatalog.modules.firstOrNull { it.id == selectedModuleId }
+        ?: ModuleCatalog.modules.first()
 
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
+    var selectedAudioUri by remember { mutableStateOf<Uri?>(null) }
     var selectedAudioName by remember { mutableStateOf("No audio selected") }
     var isPlaying by remember { mutableStateOf(false) }
     var playbackPosition by remember { mutableLongStateOf(0L) }
     var playbackDuration by remember { mutableLongStateOf(0L) }
-    var audioStatus by remember { mutableStateOf("PREVIEW READY") }
+    var audioStatus by remember { mutableStateOf("PLAYER READY") }
+    var previewAspectRatio by remember { mutableStateOf("16:9") }
+    var expandedGroup by remember(selectedModuleId) { mutableStateOf("General") }
+    var showModuleInfo by remember { mutableStateOf(false) }
+
+    var exportResolution by remember { mutableStateOf("1080p") }
+    var exportFps by remember { mutableIntStateOf(30) }
+    var exportProgress by remember { mutableFloatStateOf(0f) }
+    var exportStatus by remember { mutableStateOf("READY TO EXPORT") }
+    var isExporting by remember { mutableStateOf(false) }
+
     val audioSessionId by AudioSessionBridge.sessionId.collectAsState()
     var hasAudioPermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+        )
     }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
         hasAudioPermission = granted
         if (!granted) audioStatus = "AUDIO VISUALIZER PERMISSION DENIED"
     }
-    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+
+    val audioPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
         if (uri != null) {
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            selectedAudioName = context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0) else "Selected audio"
-            } ?: "Selected audio"
-            mediaController?.apply {
-                setMediaItem(MediaItem.fromUri(uri))
-                prepare()
-                play()
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
             }
+            selectedAudioUri = uri
+            selectedAudioName = queryAudioName(context, uri)
             audioStatus = "LOADING AUDIO"
         }
     }
 
+    val exportPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("video/mp4")
+    ) { destination: Uri? ->
+        val source = selectedAudioUri
+        if (destination != null && source != null) {
+            scope.launch {
+                isExporting = true
+                exportProgress = 0f
+                exportStatus = "STARTING EXPORT"
+                val dimensions = exportDimensions(exportResolution, previewAspectRatio)
+                val result = runCatching {
+                    VisualizerVideoExporter.export(
+                        context = context,
+                        audio = source,
+                        destination = destination,
+                        config = VideoExportConfig(
+                            width = dimensions.first,
+                            height = dimensions.second,
+                            fps = exportFps,
+                            includeAudio = true
+                        )
+                    ) { progress, message ->
+                        scope.launch {
+                            exportProgress = progress.coerceIn(0f, 1f)
+                            exportStatus = message
+                        }
+                    }
+                }
+                isExporting = false
+                result.onSuccess {
+                    exportProgress = 1f
+                    exportStatus = "MP4 SAVED SUCCESSFULLY"
+                }.onFailure { error ->
+                    exportStatus = "EXPORT FAILED: ${error.message ?: "UNKNOWN ERROR"}"
+                }
+            }
+        }
+    }
+
     DisposableEffect(context) {
-        val token = SessionToken(context, ComponentName(context, AuralisPlaybackService::class.java))
+        val token = SessionToken(
+            context,
+            ComponentName(context, AuralisPlaybackService::class.java)
+        )
         val future = MediaController.Builder(context, token).buildAsync()
         var active = true
-        future.addListener({
-            if (active) runCatching { future.get() }.onSuccess { mediaController = it }
-                .onFailure { audioStatus = "PLAYER CONNECTION FAILED" }
-        }, ContextCompat.getMainExecutor(context))
+        future.addListener(
+            {
+                if (active) {
+                    runCatching { future.get() }
+                        .onSuccess { mediaController = it }
+                        .onFailure { audioStatus = "PLAYER CONNECTION FAILED" }
+                }
+            },
+            ContextCompat.getMainExecutor(context)
+        )
         onDispose {
             active = false
             MediaController.releaseFuture(future)
             mediaController = null
         }
     }
+
+    LaunchedEffect(mediaController, selectedAudioUri) {
+        val player = mediaController
+        val uri = selectedAudioUri
+        if (player != null && uri != null) {
+            val item = MediaItem.Builder()
+                .setUri(uri)
+                .setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(selectedAudioName)
+                        .build()
+                )
+                .build()
+            player.setMediaItem(item)
+            player.prepare()
+            player.play()
+        }
+    }
+
     DisposableEffect(mediaController) {
         val player = mediaController
-        if (player == null) onDispose { } else {
+        if (player == null) {
+            onDispose { }
+        } else {
             val listener = object : Player.Listener {
                 override fun onIsPlayingChanged(playing: Boolean) {
                     isPlaying = playing
-                    audioStatus = if (playing) "LIVE AUDIO PREVIEW" else "PREVIEW PAUSED"
+                    audioStatus = if (playing) "PLAYING" else "PAUSED"
                 }
+
                 override fun onPlaybackStateChanged(state: Int) {
                     playbackDuration = player.duration.coerceAtLeast(0L)
+                    if (state == Player.STATE_BUFFERING) audioStatus = "BUFFERING"
                     if (state == Player.STATE_READY && !player.isPlaying) audioStatus = "AUDIO READY"
+                    if (state == Player.STATE_ENDED) audioStatus = "PLAYBACK COMPLETE"
+                }
+
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    isPlaying = false
+                    audioStatus = "PLAYBACK ERROR: ${error.errorCodeName}"
                 }
             }
             player.addListener(listener)
             onDispose { player.removeListener(listener) }
         }
     }
+
     LaunchedEffect(mediaController, isPlaying) {
         while (isPlaying && mediaController != null) {
             playbackPosition = mediaController?.currentPosition?.coerceAtLeast(0L) ?: 0L
             playbackDuration = mediaController?.duration?.coerceAtLeast(0L) ?: 0L
-            delay(300)
+            delay(250)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasAudioPermission) {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
     var previewSurface by remember { mutableStateOf<VisualizerSurface?>(null) }
     val capture = remember {
-        VisualizerCapture(onSpectrum = { spectrum -> previewSurface?.submitSpectrum(spectrum) })
+        VisualizerCapture(
+            onSpectrum = { spectrum ->
+                previewSurface?.submitSpectrum(spectrum)
+            }
+        )
     }
-    LaunchedEffect(Unit) {
-        if (!hasAudioPermission) permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-    }
+
     LaunchedEffect(audioSessionId, hasAudioPermission) {
         capture.stop()
-        if (hasAudioPermission && audioSessionId > 0) capture.start(audioSessionId)
+        if (hasAudioPermission && audioSessionId > 0) {
+            capture.start(audioSessionId)
+        }
     }
-    DisposableEffect(capture) { onDispose { capture.stop() } }
+    DisposableEffect(capture) {
+        onDispose { capture.stop() }
+    }
 
-    val bars = ModuleCatalog.modules.first { it.id == "BARS" }
-    fun setting(key: String, fallback: String): String =
-        values["BARS.$key"] ?: bars.groups.flatMap { it.settings }.firstOrNull { it.key == key }?.defaultValue?.takeIf { it.isNotBlank() } ?: fallback
+    val barsModule = ModuleCatalog.modules.first { it.id == "BARS" }
+    fun barSetting(key: String, fallback: String): String =
+        values["BARS.$key"]
+            ?: barsModule.groups.flatMap { it.settings }
+                .firstOrNull { it.key == key }?.defaultValue?.takeIf { it.isNotBlank() }
+            ?: fallback
+
     val liveSettings = remember(values) {
         VisualizerSettings(
-            barCount = setting("barCount", "64").toFloatOrNull()?.toInt()?.coerceIn(16, 128) ?: 64,
-            barWidth = setting("barWidth", "0.72").toFloatOrNull()?.coerceIn(0.15f, 1f) ?: 0.72f,
-            barHeight = setting("heightScale", "1").toFloatOrNull()?.coerceIn(0.1f, 2f) ?: 1f,
-            segmentCount = (1..3).count { setting("segment${it}Enabled", if (it == 1) "true" else "false").toBoolean() }.coerceAtLeast(1),
-            sensitivity = setting("maxHeightScale", "1").toFloatOrNull()?.coerceIn(0.1f, 4f) ?: 1f,
+            barCount = barSetting("barCount", "64").toFloatOrNull()
+                ?.toInt()?.coerceIn(16, 128) ?: 64,
+            barWidth = barSetting("barWidth", "0.72").toFloatOrNull()
+                ?.coerceIn(0.15f, 1f) ?: 0.72f,
+            barHeight = barSetting("heightScale", "1").toFloatOrNull()
+                ?.coerceIn(0.1f, 2f) ?: 1f,
+            segmentCount = (1..3).count {
+                barSetting("segment${it}Enabled", if (it == 1) "true" else "false")
+                    .toBoolean()
+            }.coerceAtLeast(1),
+            sensitivity = barSetting("maxHeightScale", "1").toFloatOrNull()
+                ?.coerceIn(0.1f, 4f) ?: 1f,
             particlesEnabled = values["PARTICLES.visible"]?.toBoolean() ?: false
         ).sanitized()
     }
     SideEffect { previewSurface?.updateSettings(liveSettings) }
+
+    val pageTitle = when (selectedTab) {
+        EditorTab.STUDIO -> "LIVE VISUALIZER EDITOR"
+        EditorTab.ELEMENTS -> "ADD OR EDIT ELEMENTS"
+        EditorTab.AUDIO -> "MUSIC SOURCE & PLAYBACK"
+        EditorTab.EXPORT -> "VIDEO OUTPUT SETTINGS"
+    }
 
     Scaffold(
         containerColor = EditorBackground,
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(module?.title ?: "AURALIS STUDIO", color = EditorText, fontWeight = FontWeight.Bold)
-                        Text("LIVE EDITOR", color = EditorMuted, style = MaterialTheme.typography.labelSmall)
-                    }
-                },
-                navigationIcon = {
-                    if (module != null) IconButton(onClick = { selectedModuleId = null }) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back", tint = EditorText)
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text(
+                            "AURALIS",
+                            color = EditorText,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.6.sp,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            pageTitle,
+                            color = EditorMuted,
+                            style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 0.65.sp
+                        )
                     }
                 },
                 actions = {
-                    if (module != null) {
+                    if (selectedTab == EditorTab.STUDIO) {
                         IconButton(onClick = { store.reset(module.id, module.groups) }) {
-                            Icon(Icons.Outlined.Refresh, contentDescription = "Reset module", tint = EditorText)
+                            Icon(
+                                Icons.Outlined.Refresh,
+                                contentDescription = "Reset selected module",
+                                tint = EditorText
+                            )
                         }
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Outlined.Info, contentDescription = "Module information", tint = EditorText)
+                        IconButton(onClick = { showModuleInfo = true }) {
+                            Icon(
+                                Icons.Outlined.Info,
+                                contentDescription = "Module information",
+                                tint = EditorText
+                            )
+                        }
+                    } else if (selectedTab == EditorTab.AUDIO) {
+                        IconButton(onClick = { audioPicker.launch(arrayOf("audio/*")) }) {
+                            Icon(
+                                Icons.Outlined.AudioFile,
+                                contentDescription = "Import audio",
+                                tint = EditorAccent
+                            )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = EditorBackground)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = EditorBackground,
+                    titleContentColor = EditorText,
+                    actionIconContentColor = EditorText
+                )
+            )
+        },
+        bottomBar = {
+            EditorBottomNavigation(
+                selected = selectedTab,
+                onSelect = { selectedTab = it }
             )
         }
-    ) { padding ->
+    ) { insets ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).background(EditorBackground)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(insets)
+                .background(EditorBackground)
         ) {
-            // Fixed preview zone: it never scrolls and contains no floating property controls.
+            PreviewPane(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.35f),
+                aspectRatio = previewAspectRatio,
+                onAspectRatioChange = { previewAspectRatio = it },
+                audioStatus = audioStatus,
+                hasAudio = selectedAudioUri != null,
+                audioSessionActive = audioSessionId > 0,
+                previewSurface = { previewSurface = it },
+                settings = liveSettings
+            )
+
             Column(
-                modifier = Modifier.fillMaxWidth().weight(2f).background(Color(0xFF0D0F14)).padding(horizontal = 10.dp, vertical = 7.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.65f)
+                    .background(EditorBackground)
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("LIVE PREVIEW", color = EditorText, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.weight(1f))
-                    Text(audioStatus, color = EditorAccent, style = MaterialTheme.typography.labelSmall)
-                }
-                Box(
-                    Modifier.fillMaxWidth().weight(1f).padding(top = 5.dp).clip(RoundedCornerShape(3.dp))
-                        .background(Color(0xFF000000))
-                ) {
-                    AndroidView(
-                        factory = { viewContext ->
-                            VisualizerSurface(viewContext).also {
-                                previewSurface = it
-                                it.updateSettings(liveSettings)
+                if (selectedTab != EditorTab.AUDIO) {
+                    PlaybackStrip(
+                        trackName = selectedAudioName,
+                        status = audioStatus,
+                        position = playbackPosition,
+                        duration = playbackDuration,
+                        isPlaying = isPlaying,
+                        hasTrack = selectedAudioUri != null,
+                        onPlayPause = {
+                            mediaController?.let { player ->
+                                if (player.isPlaying) player.pause()
+                                else if (player.mediaItemCount > 0) player.play()
                             }
                         },
-                        update = {
-                            previewSurface = it
-                            it.updateSettings(liveSettings)
-                        },
-                        modifier = Modifier.fillMaxSize()
+                        onImport = { audioPicker.launch(arrayOf("audio/*")) }
                     )
-                    if (audioSessionId <= 0) {
-                        Text(
-                            "IMPORT AUDIO TO START LIVE VISUALIZATION",
-                            modifier = Modifier.align(Alignment.Center).padding(12.dp),
-                            color = EditorMuted,
-                            style = MaterialTheme.typography.labelSmall
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    when (selectedTab) {
+                        EditorTab.STUDIO -> StudioPropertiesPanel(
+                            module = module,
+                            store = store,
+                            onReset = { store.reset(module.id, module.groups) },
+                            expandedGroup = expandedGroup,
+                            onExpandedGroupChange = { expandedGroup = it }
+                        )
+                        EditorTab.ELEMENTS -> ElementsPanel(
+                            selectedModuleId = selectedModuleId,
+                            onSelect = { id ->
+                                selectedModuleId = id
+                                selectedTab = EditorTab.STUDIO
+                            }
+                        )
+                        EditorTab.AUDIO -> AudioPanel(
+                            trackName = selectedAudioName,
+                            status = audioStatus,
+                            position = playbackPosition,
+                            duration = playbackDuration,
+                            isPlaying = isPlaying,
+                            hasTrack = selectedAudioUri != null,
+                            onImport = { audioPicker.launch(arrayOf("audio/*")) },
+                            onPlayPause = {
+                                mediaController?.let { player ->
+                                    if (player.isPlaying) player.pause()
+                                    else if (player.mediaItemCount > 0) player.play()
+                                }
+                            },
+                            onSeek = { fraction ->
+                                val target = (playbackDuration * fraction).toLong()
+                                mediaController?.seekTo(target)
+                                playbackPosition = target
+                            }
+                        )
+                        EditorTab.EXPORT -> ExportPanel(
+                            aspectRatio = previewAspectRatio,
+                            onAspectRatioChange = { previewAspectRatio = it },
+                            resolution = exportResolution,
+                            onResolutionChange = { exportResolution = it },
+                            fps = exportFps,
+                            onFpsChange = { exportFps = it },
+                            progress = exportProgress,
+                            status = exportStatus,
+                            isExporting = isExporting,
+                            hasAudio = selectedAudioUri != null,
+                            onExport = {
+                                if (selectedAudioUri == null) {
+                                    exportStatus = "IMPORT AN AUDIO TRACK FIRST"
+                                } else if (!isExporting) {
+                                    exportPicker.launch("Auralis-Visualizer.mp4")
+                                }
+                            }
                         )
                     }
                 }
             }
+        }
+    }
 
-            // Independent bottom scroll region: only this area moves when browsing properties.
+    if (showModuleInfo) {
+        AlertDialog(
+            onDismissRequest = { showModuleInfo = false },
+            title = { Text(module.title) },
+            text = {
+                Text(
+                    "This inspector exposes the module's full settings catalog. " +
+                        "Settings are saved locally. Only controls connected to the active OpenGL renderer " +
+                        "affect the live canvas; advanced effect controls remain stored until their renderer is integrated."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showModuleInfo = false }) { Text("GOT IT") }
+            },
+            containerColor = EditorPanel,
+            titleContentColor = EditorText,
+            textContentColor = EditorMuted
+        )
+    }
+}
+
+@Composable
+private fun EditorBottomNavigation(
+    selected: EditorTab,
+    onSelect: (EditorTab) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(62.dp)
+            .background(EditorPanel)
+            .padding(horizontal = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        EditorTab.values().forEach { tab ->
+            val active = selected == tab
             Column(
-                modifier = Modifier.fillMaxWidth().weight(3f).background(Color(0xFF13151C))
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable { onSelect(tab) }
+                    .padding(top = 4.dp, bottom = 3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("PLAYBACK & TIMELINE", color = EditorMuted, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.weight(1f))
-                        Text("● LIVE PREVIEW", color = Color(0xFF75C99B), style = MaterialTheme.typography.labelSmall)
+                Surface(
+                    color = if (active) EditorAccent.copy(alpha = 0.16f) else Color.Transparent,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.size(width = 54.dp, height = 30.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            tab.icon,
+                            contentDescription = tab.label,
+                            tint = if (active) EditorAccent else EditorMuted,
+                            modifier = Modifier.size(19.dp)
+                        )
                     }
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
-                        color = Color(0xFF1A1D26),
-                        shape = RoundedCornerShape(7.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, EditorLine)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(7.dp)
-                        ) {
-                            Icon(Icons.Outlined.AudioFile, contentDescription = null, tint = EditorAccent, modifier = Modifier.size(18.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(selectedAudioName, color = EditorText, style = MaterialTheme.typography.labelSmall, maxLines = 1)
-                                Text(formatEditorTime(playbackPosition) + " / " + formatEditorTime(playbackDuration), color = EditorMuted, style = MaterialTheme.typography.labelSmall)
-                            }
-                            FilledTonalIconButton(
-                                onClick = { if (mediaController?.isPlaying == true) mediaController?.pause() else mediaController?.play() },
-                                enabled = mediaController != null,
-                                modifier = Modifier.size(34.dp)
-                            ) {
-                                Icon(if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow, contentDescription = "Play or pause")
-                            }
-                            TextButton(onClick = { audioPicker.launch(arrayOf("audio/*")) }) { Text("IMPORT", color = EditorAccent) }
+                }
+                Text(
+                    tab.label.uppercase(),
+                    color = if (active) EditorAccent else EditorMuted,
+                    fontSize = 8.sp,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                    letterSpacing = 0.6.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewPane(
+    modifier: Modifier,
+    aspectRatio: String,
+    onAspectRatioChange: (String) -> Unit,
+    audioStatus: String,
+    hasAudio: Boolean,
+    audioSessionActive: Boolean,
+    previewSurface: (VisualizerSurface) -> Unit,
+    settings: VisualizerSettings
+) {
+    Column(
+        modifier = modifier
+            .background(Color(0xFF0B0D12))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(23.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (audioSessionActive) EditorSuccess else EditorMuted)
+            )
+            Spacer(Modifier.width(7.dp))
+            Text(
+                "CANVAS",
+                color = EditorText,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                audioStatus.uppercase(),
+                color = if (audioSessionActive) EditorSuccess else EditorMuted,
+                fontSize = 8.sp,
+                maxLines = 1
+            )
+            Spacer(Modifier.width(7.dp))
+            AspectRatioMenu(aspectRatio, onAspectRatioChange)
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            val ratio = aspectRatio.toAspectRatio()
+            val stageWidth = minOf(maxWidth, maxHeight * ratio)
+            val stageHeight = stageWidth / ratio
+
+            Box(
+                modifier = Modifier
+                    .width(stageWidth)
+                    .height(stageHeight)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                AndroidView(
+                    factory = { viewContext ->
+                        VisualizerSurface(viewContext).also {
+                            previewSurface(it)
+                            it.updateSettings(settings)
                         }
+                    },
+                    update = {
+                        previewSurface(it)
+                        it.updateSettings(settings)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                if (!hasAudio) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.GraphicEq,
+                            contentDescription = null,
+                            tint = EditorAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            "YOUR VISUALIZER CANVAS",
+                            color = EditorText,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp
+                        )
+                        Text(
+                            "Import a track to activate audio reaction",
+                            color = EditorMuted,
+                            fontSize = 8.sp
+                        )
                     }
+                } else if (!audioSessionActive) {
                     Text(
-                        if (module == null) "ELEMENTS & TOOLS" else "${module.title} · PROPERTIES",
-                        modifier = Modifier.padding(top = 7.dp),
+                        "WAITING FOR AUDIO SESSION",
                         color = EditorMuted,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 8.sp
                     )
                 }
-                if (module == null) {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 24.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        item {
-                            Text("MODULE LIBRARY", color = EditorAccent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                            Text("Choose an element. The canvas stays pinned while this dock scrolls.", color = EditorMuted, style = MaterialTheme.typography.bodySmall)
-                        }
-                        items(ModuleCatalog.modules.chunked(2)) { row ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                row.forEach { item ->
-                                    Surface(
-                                        modifier = Modifier.weight(1f).height(88.dp).clickable { selectedModuleId = item.id },
-                                        shape = RoundedCornerShape(5.dp),
-                                        color = EditorPanel,
-                                        border = androidx.compose.foundation.BorderStroke(1.dp, EditorLine)
-                                    ) {
-                                        Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                                            Text(item.title, color = EditorText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                                            Text("${item.groups.size} PROPERTY GROUPS", color = EditorMuted, style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
-                                }
-                                if (row.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AspectRatioMenu(
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)
+        ) {
+            Text(
+                selected,
+                color = EditorAccent,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = EditorPanel
+        ) {
+            listOf("16:9", "9:16", "1:1", "4:3").forEach { ratio ->
+                DropdownMenuItem(
+                    text = { Text(ratio, color = EditorText, fontSize = 12.sp) },
+                    onClick = {
+                        onSelect(ratio)
+                        expanded = false
                     }
-                } else {
-                    var expandedGroup by remember(module.id) { mutableStateOf<String?>(null) }
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 28.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item {
-                            Text("PROPERTY CONTROLS", color = EditorAccent, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                            Text("Fixed preview above · scroll this control dock to edit properties.", color = EditorMuted, style = MaterialTheme.typography.bodySmall)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaybackStrip(
+    trackName: String,
+    status: String,
+    position: Long,
+    duration: Long,
+    isPlaying: Boolean,
+    hasTrack: Boolean,
+    onPlayPause: () -> Unit,
+    onImport: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        color = EditorPanel,
+        shape = RoundedCornerShape(5.dp),
+        border = BorderStroke(1.dp, EditorLine)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .padding(horizontal = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Outlined.AudioFile,
+                contentDescription = null,
+                tint = EditorAccent,
+                modifier = Modifier.size(19.dp)
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                Text(
+                    trackName,
+                    color = EditorText,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    if (hasTrack) "${formatEditorTime(position)} / ${formatEditorTime(duration)} · ${status.uppercase()}"
+                    else "IMPORT AUDIO TO START",
+                    color = EditorMuted,
+                    fontSize = 8.sp,
+                    maxLines = 1
+                )
+            }
+            FilledTonalIconButton(
+                onClick = onPlayPause,
+                enabled = hasTrack,
+                modifier = Modifier.size(34.dp),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = EditorRaised,
+                    contentColor = EditorAccent
+                )
+            ) {
+                Icon(
+                    if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    modifier = Modifier.size(19.dp)
+                )
+            }
+            IconButton(
+                onClick = onImport,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.AudioFile,
+                    contentDescription = "Import audio",
+                    tint = EditorText,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StudioPropertiesPanel(
+    module: ModuleSpec,
+    store: ModuleSettingsStore,
+    onReset: () -> Unit,
+    expandedGroup: String?,
+    onExpandedGroupChange: (String?) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EditorBackground)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(39.dp)
+                .padding(horizontal = 13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "PROPERTY INSPECTOR",
+                    color = EditorMuted,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.9.sp
+                )
+                Text(
+                    module.title,
+                    color = EditorText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            TextButton(
+                onClick = onReset,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+            ) {
+                Text("RESET MODULE", color = EditorAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items(module.groups, key = { it.title }) { group ->
+                val expanded = expandedGroup == group.title
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = EditorPanel,
+                    shape = RoundedCornerShape(4.dp),
+                    border = BorderStroke(1.dp, EditorLine)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(49.dp)
+                                .clickable {
+                                    onExpandedGroupChange(
+                                        if (expanded) null else group.title
+                                    )
+                                }
+                                .padding(horizontal = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    group.title,
+                                    color = EditorText,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "${group.settings.size} CONTROLS",
+                                    color = EditorMuted,
+                                    fontSize = 8.sp,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                            Text(
+                                if (expanded) "−" else "+",
+                                color = EditorAccent,
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Light
+                            )
                         }
-                        items(module.groups, key = { it.title }) { group ->
-                            val expanded = expandedGroup == group.title
-                            Surface(
-                                shape = RoundedCornerShape(5.dp),
-                                color = EditorPanel,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, EditorLine),
-                                modifier = Modifier.fillMaxWidth()
+                        if (expanded) {
+                            Box(Modifier.fillMaxWidth().height(1.dp).background(EditorLine))
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 5.dp)
                             ) {
-                                Column {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().clickable { expandedGroup = if (expanded) null else group.title }
-                                            .padding(horizontal = 14.dp, vertical = 14.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(group.title, color = EditorText, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                                            Text("${group.settings.size} SETTINGS", color = EditorMuted, style = MaterialTheme.typography.labelSmall)
+                                group.settings.forEach { spec ->
+                                    SettingControl(
+                                        spec = spec,
+                                        value = store.value(module.id, spec),
+                                        onValueChange = {
+                                            store.update(module.id, spec, it)
                                         }
-                                        Text(if (expanded) "−" else "+", color = EditorAccent, style = MaterialTheme.typography.titleLarge)
-                                    }
-                                    if (expanded) {
-                                        Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
-                                            group.settings.forEach { spec ->
-                                                SettingControl(
-                                                    spec = spec,
-                                                    value = store.value(module.id, spec),
-                                                    onValueChange = { store.update(module.id, spec, it) }
-                                                )
-                                            }
-                                        }
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -345,97 +891,682 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     }
 }
 
-private fun formatEditorTime(milliseconds: Long): String {
-    val seconds = (milliseconds / 1000L).coerceAtLeast(0L)
-    return "%d:%02d".format(seconds / 60L, seconds % 60L)
+@Composable
+private fun ElementsPanel(
+    selectedModuleId: String,
+    onSelect: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EditorBackground)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 13.dp, vertical = 7.dp)
+        ) {
+            Text(
+                "ELEMENT LIBRARY",
+                color = EditorText,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp
+            )
+            Text(
+                "Choose an element to open its full inspector.",
+                color = EditorMuted,
+                fontSize = 9.sp
+            )
+        }
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 10.dp, end = 10.dp, top = 3.dp, bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            items(ModuleCatalog.modules.chunked(2)) { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    row.forEach { item ->
+                        val active = selectedModuleId == item.id
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(72.dp)
+                                .clickable { onSelect(item.id) },
+                            color = if (active) EditorAccent.copy(alpha = 0.10f) else EditorPanel,
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(
+                                1.dp,
+                                if (active) EditorAccent.copy(alpha = 0.8f) else EditorLine
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    item.title,
+                                    color = if (active) EditorAccent else EditorText,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "${item.groups.size} PROPERTY GROUPS",
+                                        color = EditorMuted,
+                                        fontSize = 7.sp,
+                                        letterSpacing = 0.3.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (active) {
+                                        Text("ACTIVE", color = EditorAccent, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioPanel(
+    trackName: String,
+    status: String,
+    position: Long,
+    duration: Long,
+    isPlaying: Boolean,
+    hasTrack: Boolean,
+    onImport: () -> Unit,
+    onPlayPause: () -> Unit,
+    onSeek: (Float) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EditorBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(
+            "AUDIO SOURCE",
+            color = EditorText,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp
+        )
+        Text(
+            "Use a track from your device. Auralis analyses the audio from its own player session.",
+            color = EditorMuted,
+            fontSize = 9.sp
+        )
+        Spacer(Modifier.height(9.dp))
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = EditorPanel,
+            shape = RoundedCornerShape(5.dp),
+            border = BorderStroke(1.dp, EditorLine)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(42.dp),
+                        color = EditorRaised,
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Outlined.AudioFile,
+                                contentDescription = null,
+                                tint = EditorAccent,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            trackName,
+                            color = EditorText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            status.uppercase(),
+                            color = if (isPlaying) EditorSuccess else EditorMuted,
+                            fontSize = 8.sp,
+                            letterSpacing = 0.6.sp
+                        )
+                    }
+                }
+
+                Slider(
+                    value = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f,
+                    onValueChange = onSeek,
+                    enabled = hasTrack && duration > 0L,
+                    colors = SliderDefaults.colors(
+                        thumbColor = EditorAccent,
+                        activeTrackColor = EditorAccent,
+                        inactiveTrackColor = EditorLine
+                    ),
+                    modifier = Modifier.height(28.dp)
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(formatEditorTime(position), color = EditorMuted, fontSize = 8.sp, modifier = Modifier.weight(1f))
+                    Text(formatEditorTime(duration), color = EditorMuted, fontSize = 8.sp)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onImport,
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        border = BorderStroke(1.dp, EditorLine),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorText),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Icon(Icons.Outlined.AudioFile, null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (hasTrack) "CHANGE TRACK" else "IMPORT AUDIO", fontSize = 9.sp)
+                    }
+                    FilledIconButton(
+                        onClick = onPlayPause,
+                        enabled = hasTrack,
+                        modifier = Modifier.size(40.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = EditorAccent,
+                            contentColor = EditorBackground
+                        )
+                    ) {
+                        Icon(
+                            if (isPlaying) Icons.Outlined.Pause else Icons.Outlined.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play"
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Text(
+            "AUDIO ANALYSIS",
+            color = EditorText,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.8.sp
+        )
+        Spacer(Modifier.height(5.dp))
+        AudioInfoRow("Capture source", "Auralis Media3 player session")
+        AudioInfoRow("Analysis data", "Live FFT spectrum")
+        AudioInfoRow("Current visualizer", "OpenGL ES spectrum renderer")
+        AudioInfoRow("Background playback", "MediaSession service")
+    }
+}
+
+@Composable
+private fun AudioInfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = EditorMuted, fontSize = 9.sp, modifier = Modifier.weight(1f))
+        Text(value, color = EditorText, fontSize = 9.sp, fontWeight = FontWeight.Medium)
+    }
+    Box(Modifier.fillMaxWidth().height(1.dp).background(EditorLine.copy(alpha = 0.7f)))
+}
+
+@Composable
+private fun ExportPanel(
+    aspectRatio: String,
+    onAspectRatioChange: (String) -> Unit,
+    resolution: String,
+    onResolutionChange: (String) -> Unit,
+    fps: Int,
+    onFpsChange: (Int) -> Unit,
+    progress: Float,
+    status: String,
+    isExporting: Boolean,
+    hasAudio: Boolean,
+    onExport: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EditorBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(5.dp))
+                .background(EditorPanel)
+                .padding(12.dp)
+                .then(Modifier),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Text(
+                "VIDEO EXPORT",
+                color = EditorText,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.9.sp
+            )
+            Text(
+                "Choose a frame shape, output size and frame rate.",
+                color = EditorMuted,
+                fontSize = 9.sp
+            )
+
+            ExportChoiceRow(
+                title = "ASPECT RATIO",
+                options = listOf("16:9", "9:16", "1:1", "4:3"),
+                selected = aspectRatio,
+                onSelect = onAspectRatioChange
+            )
+            ExportChoiceRow(
+                title = "RESOLUTION",
+                options = listOf("720p", "1080p", "1440p", "2160p"),
+                selected = resolution,
+                onSelect = onResolutionChange
+            )
+            ExportChoiceRow(
+                title = "FRAME RATE",
+                options = listOf("25", "30", "50", "60"),
+                selected = fps.toString(),
+                onSelect = { onFpsChange(it.toInt()) },
+                suffix = " FPS"
+            )
+
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("SOURCE AUDIO", color = EditorMuted, fontSize = 8.sp, modifier = Modifier.weight(1f))
+                Text(
+                    if (hasAudio) "READY" else "NOT SELECTED",
+                    color = if (hasAudio) EditorSuccess else EditorAccent,
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            LinearProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(3.dp),
+                color = EditorAccent,
+                trackColor = EditorLine
+            )
+            Text(status, color = EditorMuted, fontSize = 8.sp, maxLines = 2)
+
+            Button(
+                onClick = onExport,
+                enabled = hasAudio && !isExporting,
+                modifier = Modifier.fillMaxWidth().height(43.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = EditorAccent,
+                    contentColor = EditorBackground,
+                    disabledContainerColor = EditorRaised,
+                    disabledContentColor = EditorMuted
+                ),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                if (isExporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = EditorBackground,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                } else {
+                    Icon(Icons.Outlined.FileDownload, contentDescription = null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
+                }
+                Text(
+                    if (isExporting) "RENDERING VIDEO" else "RENDER MP4",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.6.sp
+                )
+            }
+            Text(
+                "Export currently renders the active spectrum-video pipeline with the selected audio track.",
+                color = EditorMuted,
+                fontSize = 8.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExportChoiceRow(
+    title: String,
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    suffix: String = ""
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            title,
+            color = EditorMuted,
+            fontSize = 8.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 0.6.sp
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            options.forEach { option ->
+                val active = option == selected
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(31.dp)
+                        .clickable { onSelect(option) },
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (active) EditorAccent.copy(alpha = 0.16f) else EditorRaised,
+                    border = BorderStroke(
+                        1.dp,
+                        if (active) EditorAccent else EditorLine
+                    )
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            option + suffix,
+                            color = if (active) EditorAccent else EditorText,
+                            fontSize = 8.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingControl(spec: SettingSpec, value: String, onValueChange: (String) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 10.dp)) {
+private fun SettingControl(
+    spec: SettingSpec,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp)
+    ) {
         when (spec.kind) {
             SettingKind.CHECKBOX -> {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(spec.label, modifier = Modifier.weight(1f), color = EditorText, style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = value.toBooleanStrictOrNull() ?: false, onCheckedChange = { onValueChange(it.toString()) })
+                Row(
+                    modifier = Modifier.heightIn(min = 38.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        spec.label,
+                        modifier = Modifier.weight(1f),
+                        color = EditorText,
+                        fontSize = 10.sp
+                    )
+                    Switch(
+                        checked = value.toBooleanStrictOrNull() ?: false,
+                        onCheckedChange = { onValueChange(it.toString()) },
+                        modifier = Modifier.height(30.dp)
+                    )
                 }
             }
+
             SettingKind.SLIDER -> {
-                val numeric = value.toFloatOrNull()?.coerceIn(spec.min, spec.max) ?: spec.min
+                val min = minOf(spec.min, spec.max)
+                val max = maxOf(spec.min, spec.max).let { if (it == min) min + 1f else it }
+                val numeric = value.toFloatOrNull()?.coerceIn(min, max) ?: min
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(spec.label, modifier = Modifier.weight(1f), color = EditorText, style = MaterialTheme.typography.bodyMedium)
-                    Text("%.3f".format(numeric), color = EditorAccent, style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        spec.label,
+                        modifier = Modifier.weight(1f),
+                        color = EditorText,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        formatSettingNumber(numeric),
+                        color = EditorAccent,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
-                Slider(value = numeric, onValueChange = { onValueChange(it.toString()) }, valueRange = spec.min..spec.max)
+                Slider(
+                    value = numeric,
+                    onValueChange = { onValueChange(it.toString()) },
+                    valueRange = min..max,
+                    colors = SliderDefaults.colors(
+                        thumbColor = EditorAccent,
+                        activeTrackColor = EditorAccent,
+                        inactiveTrackColor = EditorLine
+                    ),
+                    modifier = Modifier.height(31.dp)
+                )
             }
+
             SettingKind.DROPDOWN -> {
                 var expanded by remember(spec.key) { mutableStateOf(false) }
-                Text(spec.label, color = EditorText, style = MaterialTheme.typography.bodyMedium)
-                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it }
+                ) {
                     OutlinedTextField(
                         value = value.ifBlank { spec.options.firstOrNull().orEmpty() },
-                        onValueChange = {}, readOnly = true,
-                        modifier = Modifier.menuAnchor().fillMaxWidth(),
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        singleLine = true
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                        },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodySmall
                     )
-                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
                         spec.options.forEach { option ->
-                            DropdownMenuItem(text = { Text(option) }, onClick = { onValueChange(option); expanded = false })
+                            DropdownMenuItem(
+                                text = { Text(option, fontSize = 11.sp) },
+                                onClick = {
+                                    onValueChange(option)
+                                    expanded = false
+                                }
+                            )
                         }
                     }
                 }
             }
+
             SettingKind.COLOR -> {
-                Text(spec.label, color = EditorText, style = MaterialTheme.typography.bodyMedium)
+                Text(spec.label, color = EditorText, fontSize = 10.sp)
                 OutlinedTextField(
                     value = value,
-                    onValueChange = { typed -> if (typed.matches(Regex("#?[0-9A-Fa-f]{0,8}"))) onValueChange(if (typed.startsWith("#")) typed else "#$typed") },
-                    modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    supportingText = { Text("RGBA hex: #RRGGBBAA") },
+                    onValueChange = { typed ->
+                        if (typed.matches(Regex("#?[0-9A-Fa-f]{0,8}"))) {
+                            onValueChange(if (typed.startsWith("#")) typed else "#$typed")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    supportingText = {
+                        Text("RGBA hex · #RRGGBBAA", fontSize = 8.sp)
+                    },
                     leadingIcon = {
                         val parsed = remember(value) {
                             runCatching {
                                 val hex = value.removePrefix("#")
                                 if (hex.length == 8) {
-                                    val r = hex.substring(0,2).toInt(16) / 255f
-                                    val g = hex.substring(2,4).toInt(16) / 255f
-                                    val b = hex.substring(4,6).toInt(16) / 255f
-                                    val a = hex.substring(6,8).toInt(16) / 255f
-                                    Color(r,g,b,a)
-                                } else Color.Transparent
+                                    Color(
+                                        red = hex.substring(0, 2).toInt(16) / 255f,
+                                        green = hex.substring(2, 4).toInt(16) / 255f,
+                                        blue = hex.substring(4, 6).toInt(16) / 255f,
+                                        alpha = hex.substring(6, 8).toInt(16) / 255f
+                                    )
+                                } else {
+                                    Color.Transparent
+                                }
                             }.getOrDefault(Color.Transparent)
                         }
-                        Box(Modifier.size(18.dp).clip(RoundedCornerShape(3.dp)).background(parsed))
+                        Box(
+                            Modifier
+                                .size(18.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(parsed)
+                        )
                     }
                 )
             }
+
             SettingKind.IMAGE_PICKER -> {
-                Text(spec.label, color = EditorText, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onClick = { /* Image picker wiring is a separate follow-up. */ }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (value.isBlank()) "Choose image" else value.substringAfterLast('/'))
+                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                OutlinedButton(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth().height(37.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    border = BorderStroke(1.dp, EditorLine),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorText),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(if (value.isBlank()) "CHOOSE IMAGE" else value.substringAfterLast('/'), fontSize = 9.sp)
                 }
             }
+
             SettingKind.FONT_PICKER -> {
-                Text(spec.label, color = EditorText, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onClick = { /* Font picker wiring is a separate follow-up. */ }, modifier = Modifier.fillMaxWidth()) {
-                    Text(value.ifBlank { "Choose font" })
+                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                OutlinedButton(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth().height(37.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    border = BorderStroke(1.dp, EditorLine),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorText),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(value.ifBlank { "CHOOSE FONT" }, fontSize = 9.sp)
                 }
             }
+
             SettingKind.CODE, SettingKind.TEXT -> {
-                Text(spec.label, color = EditorText, style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(value = value, onValueChange = onValueChange, modifier = Modifier.fillMaxWidth(), minLines = if (spec.kind == SettingKind.CODE) 5 else 1)
+                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = if (spec.kind == SettingKind.CODE) 5 else 1,
+                    textStyle = MaterialTheme.typography.bodySmall
+                )
             }
+
             SettingKind.NUMBER -> {
-                Text(spec.label, color = EditorText, style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(value = value, onValueChange = { input -> if (input.isEmpty() || input.toFloatOrNull() != null) onValueChange(input) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { input ->
+                        if (input.isEmpty() || input.toFloatOrNull() != null) {
+                            onValueChange(input)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodySmall
+                )
             }
+
             SettingKind.ACTION -> {
-                OutlinedButton(onClick = { /* Hook to shader compiler / variable registry. */ }, modifier = Modifier.fillMaxWidth()) {
-                    Text(spec.label)
+                OutlinedButton(
+                    onClick = { },
+                    modifier = Modifier.fillMaxWidth().height(37.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    border = BorderStroke(1.dp, EditorLine),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EditorAccent),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(spec.label.uppercase(), fontSize = 9.sp)
                 }
             }
         }
     }
+}
+
+private fun queryAudioName(context: android.content.Context, uri: Uri): String {
+    return context.contentResolver.query(
+        uri,
+        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+        null,
+        null,
+        null
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            cursor.getString(0)?.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+    } ?: "Selected audio"
+}
+
+private fun String.toAspectRatio(): Float = when (this) {
+    "9:16" -> 9f / 16f
+    "1:1" -> 1f
+    "4:3" -> 4f / 3f
+    else -> 16f / 9f
+}
+
+private fun exportDimensions(resolution: String, aspectRatio: String): Pair<Int, Int> {
+    val longEdge = when (resolution) {
+        "720p" -> 720
+        "1440p" -> 1440
+        "2160p" -> 2160
+        else -> 1080
+    }
+    val raw = when (aspectRatio) {
+        "9:16" -> (longEdge * 9f / 16f).roundToInt() to longEdge
+        "1:1" -> longEdge to longEdge
+        "4:3" -> longEdge to (longEdge * 3f / 4f).roundToInt()
+        else -> longEdge to (longEdge * 9f / 16f).roundToInt()
+    }
+    val upScale = maxOf(640f / raw.first, 480f / raw.second, 1f)
+    val scaledWidth = (raw.first * upScale).roundToInt()
+    val scaledHeight = (raw.second * upScale).roundToInt()
+    val downScale = minOf(3840f / scaledWidth, 2160f / scaledHeight, 1f)
+    return (scaledWidth * downScale).roundToInt() to
+        (scaledHeight * downScale).roundToInt()
+}
+
+private fun formatSettingNumber(value: Float): String {
+    return if (value == value.toInt().toFloat()) value.toInt().toString()
+    else "%.2f".format(value)
+}
+
+private fun formatEditorTime(milliseconds: Long): String {
+    val seconds = (milliseconds / 1000L).coerceAtLeast(0L)
+    return "%d:%02d".format(seconds / 60L, seconds % 60L)
 }
