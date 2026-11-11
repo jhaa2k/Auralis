@@ -346,7 +346,22 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         }.getOrDefault(false) }
         val rgbAmount = layers.firstOrNull { it.type == "RGBSPLITEFFECT" }?.let { effect ->
             val effectKey = "layer_${effect.id}_${effect.type}"
-            (values["$effectKey.splitAmount"] ?: values["RGBSPLITEFFECT.splitAmount"])?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
+            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+            if (enabled) (values["$effectKey.splitAmount"] ?: values["RGBSPLITEFFECT.splitAmount"])?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f else 0f
+        } ?: 0f
+        val blurAmount = layers.firstOrNull { it.type == "BLUREFFECT" }?.let { effect ->
+            val effectKey = "layer_${effect.id}_${effect.type}"
+            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+            if (enabled) {
+                val radius = (values["$effectKey.blurRadius"] ?: "2").toFloatOrNull() ?: 2f
+                val multiplier = (values["$effectKey.blurMultiplier"] ?: "4.1").toFloatOrNull() ?: 4.1f
+                (radius * multiplier / 100f).coerceIn(0f, 1f)
+            } else 0f
+        } ?: 0f
+        val motionBlurAmount = layers.firstOrNull { it.type == "MOTIONBLUREFFECT" }?.let { effect ->
+            val effectKey = "layer_${effect.id}_${effect.type}"
+            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+            if (enabled) (values["$effectKey.blurAmount"] ?: "0.2").toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f else 0f
         } ?: 0f
         return when (layer.type) {
             "BARS" -> {
@@ -364,7 +379,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     sensitivity = number("maxHeightScale", 1f).coerceIn(0.1f, 4f),
                     smoothing = number("softness", 0.35f).coerceIn(0f, 0.95f),
                     opacity = number("alpha", 1f).coerceIn(0f, 1f),
-                    glow = number("glow", 0.25f).coerceIn(0f, 1f),
+                    glow = blurAmount.coerceIn(0f, 1f),
+                    motionBlurAmount = motionBlurAmount,
                     positionX = number("positionX", 0.5f),
                     positionY = number("positionY", 0.5f),
                     scale = ((number("scaleX", 1f) + number("scaleY", 1f)) / 2f).coerceIn(0.1f, 3f),
