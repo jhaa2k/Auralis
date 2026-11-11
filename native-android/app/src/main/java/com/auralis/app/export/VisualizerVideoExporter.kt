@@ -11,7 +11,6 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import javax.microedition.khronos.egl.EGLConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.*
@@ -175,7 +174,7 @@ object VisualizerVideoExporter {
         init {
             val v=IntArray(2);check(EGL14.eglInitialize(display,v,0,v,1))
             val attrs=intArrayOf(EGL14.EGL_RED_SIZE,8,EGL14.EGL_GREEN_SIZE,8,EGL14.EGL_BLUE_SIZE,8,EGL14.EGL_ALPHA_SIZE,8,EGL14.EGL_RENDERABLE_TYPE,EGL14.EGL_OPENGL_ES2_BIT,0x3142,1,EGL14.EGL_NONE)
-            val cs=arrayOfNulls<EGLConfig>(1);val n=IntArray(1);check(EGL14.eglChooseConfig(display,attrs,0,cs,0,1,n,0)&&n[0]>0)
+            val cs=arrayOfNulls<android.opengl.EGLConfig>(1);val n=IntArray(1);check(EGL14.eglChooseConfig(display,attrs,0,cs,0,1,n,0)&&n[0]>0)
             context=EGL14.eglCreateContext(display,cs[0],EGL14.EGL_NO_CONTEXT,intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION,2,EGL14.EGL_NONE),0)
             surface=EGL14.eglCreateWindowSurface(display,cs[0],input,intArrayOf(EGL14.EGL_NONE),0)
             check(EGL14.eglMakeCurrent(display,surface,surface,context))
