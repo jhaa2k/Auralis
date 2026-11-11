@@ -295,30 +295,51 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     }
 
     val barsModule = ModuleCatalog.modules.first { it.id == "BARS" }
-    fun barSetting(key: String, fallback: String): String =
-        values["$layerSettingsKey.$key"] ?: values["BARS.$key"]
-            ?: barsModule.groups.flatMap { it.settings }
-                .firstOrNull { it.key == key }?.defaultValue?.takeIf { it.isNotBlank() }
+    fun layerSetting(key: String, fallback: String): String =
+        values["$layerSettingsKey.$key"]
+            ?: values["\${selectedLayer.type}.$key"]
+            ?: if (selectedLayer.type == "BARS") values["BARS.$key"] else null
+            ?: if (selectedLayer.type == "BARS") {
+                barsModule.groups.flatMap { it.settings }
+                    .firstOrNull { it.key == key }?.defaultValue?.takeIf { it.isNotBlank() }
+            } else null
             ?: fallback
+    fun layerFloat(key: String, fallback: Float): Float =
+        layerSetting(key, fallback.toString()).toFloatOrNull() ?: fallback
+    fun layerBool(key: String, fallback: Boolean = false): Boolean =
+        layerSetting(key, fallback.toString()).toBooleanStrictOrNull() ?: fallback
 
-    val liveSettings = remember(values) {
+    val layerVisible = layerBool("visible", true)
+    val liveSettings = remember(values, selectedLayerId, selectedLayer.type, playbackPosition, playbackDuration) {
+        val enabledSegments = (1..3).count { layerBool("segment\${it}Enabled", it == 1) }
         VisualizerSettings(
-            barCount = barSetting("barCount", "64").toFloatOrNull()
-                ?.toInt()?.coerceIn(16, 128) ?: 64,
-            barWidth = barSetting("barWidth", "0.72").toFloatOrNull()
-                ?.coerceIn(0.15f, 1f) ?: 0.72f,
-            barHeight = barSetting("heightScale", "1").toFloatOrNull()
-                ?.coerceIn(0.1f, 2f) ?: 1f,
-            segmentCount = (1..3).count {
-                barSetting("segment${it}Enabled", if (it == 1) "true" else "false")
-                    .toBoolean()
-            }.coerceAtLeast(1),
-            sensitivity = barSetting("maxHeightScale", "1").toFloatOrNull()
-                ?.coerceIn(0.1f, 4f) ?: 1f,
-            particlesEnabled = selectedLayer.type == "PARTICLES" &&
-                (values["$layerSettingsKey.visible"]?.toBooleanStrictOrNull() ?: true),
-            barsEnabled = selectedLayer.type == "BARS" &&
-                (values["$layerSettingsKey.visible"]?.toBooleanStrictOrNull() ?: true)
+            barCount = layerFloat("barCount", 64f).toInt().coerceIn(16, 128),
+            barWidth = layerFloat("barWidth", 0.72f).coerceIn(0.15f, 1f),
+            barHeight = layerFloat("heightScale", 1f).coerceIn(0.1f, 2f),
+            segmentCount = enabledSegments.coerceAtLeast(1),
+            segmentGap = layerFloat("barSpacing", 0.18f).coerceIn(0f, 0.45f),
+            sensitivity = layerFloat("maxHeightScale", 1f).coerceIn(0.1f, 4f),
+            smoothing = layerFloat("softness", 0.35f).coerceIn(0f, 0.95f),
+            positionX = layerFloat("positionX", 0.5f),
+            positionY = layerFloat("positionY", 0.5f),
+            scale = layerFloat("scaleX", 1f).coerceIn(0.1f, 3f),
+            rotation = layerFloat("rotation", 0f),
+            mirror = layerBool("mirrorX") || layerBool("mirrorY"),
+            particlesEnabled = selectedLayer.type == "PARTICLES" && layerVisible,
+            particleCount = layerFloat("countLimit", 120f).toInt().coerceIn(0, 400),
+            particleSpeed = layerFloat("speed", 1f).coerceIn(0.1f, 4f),
+            particleSize = layerFloat("startSize", 3f).coerceIn(1f, 12f),
+            particleSpread = layerFloat("amountX", 0.8f).coerceIn(0.1f, 2f),
+            particlePositionX = layerFloat("positionX", 0.5f),
+            particlePositionY = layerFloat("positionY", 0.5f),
+            particleScale = layerFloat("particleScale", 1f).coerceIn(0.1f, 3f),
+            rgbSplitAmount = if (selectedLayer.type == "RGBSPLITEFFECT") {
+                layerFloat("splitAmount", 0f).coerceIn(0f, 1f)
+            } else 0f,
+            trackPositionFraction = if (playbackDuration > 0L) {
+                (playbackPosition.toFloat() / playbackDuration).coerceIn(0f, 1f)
+            } else 0f,
+            barsEnabled = selectedLayer.type == "BARS" && layerVisible
         ).sanitized()
     }
     SideEffect { previewSurface?.updateSettings(liveSettings) }
