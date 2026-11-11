@@ -222,7 +222,7 @@ object VisualizerVideoExporter {
                 val angle = Math.toRadians((config.rotation + rotationOffset).toDouble())
                 val cs = cos(angle).toFloat(); val sn = sin(angle).toFloat()
                 val cx = (config.positionX - .5f) * 2f; val cy = (.5f - config.positionY) * 2f
-                val sx = x * config.scale; val sy = y * config.scale
+                val sx = x * config.scale * config.scaleX; val sy = y * config.scale * config.scaleY
                 buf.put(sx*cs-sy*sn+cx); buf.put(sx*sn+sy*cs+cy)
                 buf.put(red); buf.put(green); buf.put(blue); buf.put(alpha)
             }
@@ -283,6 +283,12 @@ object VisualizerVideoExporter {
                 }
             }
             configs.forEach { config ->
+                when (config.blendMode) {
+                    "Add" -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE)
+                    "Screen" -> GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_COLOR)
+                    "Multiply" -> GLES20.glBlendFunc(GLES20.GL_DST_COLOR, GLES20.GL_ZERO)
+                    else -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+                }
                 if (config.barsEnabled) {
                     val count = config.barCount.coerceIn(16,128)
                     val slot = 2f/count; val width = slot*config.barWidth.coerceIn(.15f,1f)
