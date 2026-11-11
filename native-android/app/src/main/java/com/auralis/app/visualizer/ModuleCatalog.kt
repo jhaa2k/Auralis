@@ -169,7 +169,7 @@ object ModuleCatalog {
                     s("segment${n}Mirror","Mirror",SettingKind.CHECKBOX), s("segment${n}FlipOther","Flip Every Other",SettingKind.CHECKBOX)
                 )
             } + listOf(
-                group("Behavior",s("measurePos","Measure Pos",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureScale","Measure Scale",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureRot","Measure Rot",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("softness","Softness"),s("reactionDelay","Reaction Delay"),
+                group("Behavior",s("measurePos","Measure Pos",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureScale","Measure Scale",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("measureRot","Measure Rot",SettingKind.DROPDOWN,options=measures,default="Nothing"),s("softness","Softness"),
                     )
             )
         ),
