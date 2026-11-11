@@ -404,7 +404,20 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         return when (layer.type) {
             "COMPOSITION" -> VisualizerSettings(backgroundColor = compositionBackground, barsEnabled = false)
             "BARS" -> {
-                val segments = (1..3).count { flag("segment${it}Enabled", it == 1) }.coerceAtLeast(1)
+                val segmentStyles = (1..3).map { index ->
+                    BarSegmentStyle(
+                        enabled = flag("segment${index}Enabled", index == 1),
+                        shape = raw("segment${index}Shape", "Rectangle"),
+                        colorFrom = argb("segment${index}ColorFrom", 0xFFFFFFFFL),
+                        colorTo = argb("segment${index}ColorTo", 0xFF00FFFFL),
+                        fixedHeight = number("segment${index}FixedHeight", 0f),
+                        heightMultiplier = number("segment${index}HeightMultiplier", 1f),
+                        mirror = flag("segment${index}Mirror"),
+                        flipOther = flag("segment${index}FlipOther")
+                    )
+                }.filter { it.enabled }
+                val activeSegments = segmentStyles.ifEmpty { listOf(BarSegmentStyle(enabled = true, heightMultiplier = 0f)) }
+                val firstSegment = activeSegments.first()
                 VisualizerSettings(
                     backgroundColor = compositionBackground,
                     barCount = number("barCount", 64f).toInt().coerceIn(16, 128),
@@ -412,9 +425,10 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     barHeight = number("heightScale", 1f).coerceIn(0.1f, 2f),
                     barMinHeight = number("minHeightScale", 0f).coerceIn(0f, 1f),
                     flipInput = flag("flipInput"),
-                    barColorFrom = argb("segment1ColorFrom", 0xFFFFFFFFL),
-                    barColorTo = argb("segment1ColorTo", 0xFF00FFFFL),
-                    segmentCount = segments,
+                    barColorFrom = firstSegment.colorFrom,
+                    barColorTo = firstSegment.colorTo,
+                    segmentCount = activeSegments.size.coerceAtLeast(1),
+                    segmentStyles = activeSegments,
                     segmentGap = number("barSpacing", 0.18f).coerceIn(0f, 0.45f),
                     sensitivity = number("maxHeightScale", 1f).coerceIn(0.1f, 4f),
                     smoothing = number("softness", 0.35f).coerceIn(0f, 0.95f),
