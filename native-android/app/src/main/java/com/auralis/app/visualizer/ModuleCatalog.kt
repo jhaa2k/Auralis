@@ -78,6 +78,8 @@ object ModuleCatalog {
             "positionX", "positionY", "alignmentX", "alignmentY", "pivotX", "pivotY" -> "0.5"
             "scaleX", "scaleY", "particleScale", "opacity", "opacityStrength", "alpha", "contrast", "saturation", "lineHeight" -> "1"
             "rotation", "splitAmount", "brightness", "colorBlendOffset", "gravityX", "gravityY" -> "0"
+            "measureAmount" -> "0.5"
+            "beatSensitivity" -> "0.55"
             "barCount" -> "64"
             "barWidth" -> "0.72"
             "barSpacing" -> "0.18"
