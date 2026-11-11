@@ -65,8 +65,8 @@ fun StructuralEditorScreen(
     onExport: () -> Unit = {},
     onNavigationSelected: (String) -> Unit = {}
 ) {
-    var selectedTab by remember { mutableStateOf("Layers") }
-    var sheetVisible by remember { mutableStateOf(true) }
+    var selectedTab by remember { mutableStateOf("Presets") }
+    var sheetVisible by remember { mutableStateOf(false) }
     var activeSection by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sections = remember(selectedTab) {
