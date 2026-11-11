@@ -37,6 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -864,9 +866,16 @@ private fun PreviewPane(
 
 @Composable
 private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String>, trackName: String) {
-    val key = if (layer.id == 1 && layer.type == "BARS") "BARS" else "layer_${layer.id}_${layer.type}"
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val key = "layer_${layer.id}_${layer.type}"
     fun value(name: String, fallback: String) = values["$key.$name"] ?: values["TEXT.$name"] ?: fallback
     if (value("visible", "true").toBooleanStrictOrNull() == false) return
+    val fontUri = value("fontFamily", "")
+    val typeface by produceState<android.graphics.Typeface?>(initialValue = null, fontUri) {
+        value = if (fontUri.isBlank()) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { context.contentResolver.openFileDescriptor(Uri.parse(fontUri), "r")?.use { android.graphics.Typeface.Builder(it.fileDescriptor).build() } }.getOrNull()
+        }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val x = value("positionX", "0.5").toFloatOrNull() ?: 0.5f
         val y = value("positionY", "0.5").toFloatOrNull() ?: 0.5f
@@ -876,17 +885,28 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         val size = value("fontSize", "30").toFloatOrNull()?.coerceIn(6f, 300f) ?: 30f
         val color = runCatching { Color(android.graphics.Color.parseColor(value("textColor", "#FFFFFFFF"))) }.getOrDefault(Color.White)
         val text = value("textInput", "{ArtistOrTitle}").replace("{ArtistOrTitle}", trackName.substringBeforeLast('.', trackName)).replace("%title%", trackName)
+        val alignment = when (value("alignment", "Center")) {
+            "Left" -> TextAlign.Start
+            "Right" -> TextAlign.End
+            "Justify" -> TextAlign.Justify
+            else -> TextAlign.Center
+        }
         Box(
             modifier = Modifier.align(Alignment.Center).offset {
                 IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight).toInt())
             }.graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f), scaleY = sy.coerceIn(0.05f, 8f), rotationZ = rotation),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = text, color = color, fontSize = size.sp, fontWeight = if (value("fontWeight", "400").toIntOrNull()?.let { it >= 700 } == true) FontWeight.Bold else FontWeight.Normal)
+            Text(
+                text = text, color = color, fontSize = size.sp,
+                fontFamily = typeface?.let { FontFamily(it) } ?: FontFamily.Default,
+                textAlign = alignment,
+                letterSpacing = (value("letterSpacing", "0").toFloatOrNull() ?: 0f).sp,
+                fontWeight = if (value("fontWeight", "400").toIntOrNull()?.let { it >= 700 } == true) FontWeight.Bold else FontWeight.Normal
+            )
         }
     }
 }
-
 @Composable
 private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, String>) {
     val context = androidx.compose.ui.platform.LocalContext.current
