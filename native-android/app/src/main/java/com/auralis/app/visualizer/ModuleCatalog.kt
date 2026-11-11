@@ -18,10 +18,10 @@ object ModuleCatalog {
         "scaleX", "scaleY" -> 0.1f to 3f
         "particleScale" -> 0.1f to 4f
         "alpha", "opacity", "opacityStrength", "threshold", "softness", "colorBlendOffset",
-        "barSpacing" -> 0f to 0.45f
         "blurAmount", "splitAmount", "relativeMotion" -> 0f to 1f
+        "barSpacing" -> 0f to 0.45f
         "barCount" -> 16f to 128f
-        "barWidth" -> 0.05f to 1f
+        "barWidth" -> 0.15f to 1f
         "heightScale", "maxHeightScale" -> 0f to 4f
         "minHeightScale" -> 0f to 1f
         "rotation" -> -180f to 180f
