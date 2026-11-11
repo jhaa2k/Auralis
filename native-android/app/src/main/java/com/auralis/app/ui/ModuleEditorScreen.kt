@@ -534,6 +534,35 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                             settingsKey = layerSettingsKey,
                             store = store,
                             onReset = { store.reset(layerSettingsKey, module.groups) },
+                            onAction = { action ->
+                                when (action.key) {
+                                    "compileApply" -> {
+                                        val vertexSpec = module.groups.flatMap { it.settings }.firstOrNull { it.key == "vertexShader" }
+                                        val fragmentSpec = module.groups.flatMap { it.settings }.firstOrNull { it.key == "fragmentShader" }
+                                        if (vertexSpec != null && fragmentSpec != null && previewSurface != null) {
+                                            previewSurface?.applyCustomShader(
+                                                store.value(layerSettingsKey, vertexSpec),
+                                                store.value(layerSettingsKey, fragmentSpec)
+                                            ) { success, error ->
+                                                audioStatus = if (success) "CUSTOM SHADER APPLIED" else "SHADER ERROR: ${error ?: "INVALID GLSL"}"
+                                            }
+                                        } else audioStatus = "PREVIEW NOT READY"
+                                    }
+                                    "addVariable" -> {
+                                        val specs = module.groups.flatMap { it.settings }
+                                        val typeSpec = specs.firstOrNull { it.key == "newVariable" }
+                                        val mappingSpec = specs.firstOrNull { it.key == "variableMappings" }
+                                        if (typeSpec != null && mappingSpec != null) {
+                                            val type = store.value(layerSettingsKey, typeSpec)
+                                            if (type != "None") {
+                                                val current = store.value(layerSettingsKey, mappingSpec)
+                                                val nextIndex = current.lineSequence().count { it.isNotBlank() } + 1
+                                                store.update(layerSettingsKey, mappingSpec, (current + "\nvar$nextIndex:$type").trim())
+                                            }
+                                        }
+                                    }
+                                }
+                            },
                             expandedGroup = expandedGroup,
                             onExpandedGroupChange = { expandedGroup = it }
                         )
@@ -1016,6 +1045,7 @@ private fun StudioPropertiesPanel(
     settingsKey: String,
     store: ModuleSettingsStore,
     onReset: () -> Unit,
+    onAction: (SettingSpec) -> Unit,
     expandedGroup: String?,
     onExpandedGroupChange: (String?) -> Unit
 ) {
@@ -1114,7 +1144,8 @@ private fun StudioPropertiesPanel(
                                         value = store.value(settingsKey, spec),
                                         onValueChange = {
                                             store.update(settingsKey, spec, it)
-                                        }
+                                        },
+                                        onAction = { onAction(spec) }
                                     )
                                 }
                             }
@@ -1551,7 +1582,8 @@ private fun ExportChoiceRow(
 private fun SettingControl(
     spec: SettingSpec,
     value: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    onAction: () -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -1756,7 +1788,7 @@ private fun SettingControl(
 
             SettingKind.ACTION -> {
                 OutlinedButton(
-                    onClick = { },
+                    onClick = onAction,
                     modifier = Modifier.fillMaxWidth().height(37.dp),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     border = BorderStroke(1.dp, EditorLine),
