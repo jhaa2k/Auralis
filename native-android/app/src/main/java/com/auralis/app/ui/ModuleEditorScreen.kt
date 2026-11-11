@@ -1426,7 +1426,7 @@ private fun AudioPanel(
                     Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            trackName,
+                            trackName.uppercase(),
                             color = EditorText,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -1511,8 +1511,8 @@ private fun AudioInfoRow(label: String, value: String) {
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = EditorMuted, fontSize = 9.sp, modifier = Modifier.weight(1f))
-        Text(value, color = EditorText, fontSize = 9.sp, fontWeight = FontWeight.Medium)
+        Text(label.uppercase(), color = EditorMuted, fontSize = 9.sp, modifier = Modifier.weight(1f))
+        Text(value.uppercase(), color = EditorText, fontSize = 9.sp, fontWeight = FontWeight.Medium)
     }
     Box(Modifier.fillMaxWidth().height(1.dp).background(EditorLine.copy(alpha = 0.7f)))
 }
@@ -1769,7 +1769,7 @@ private fun SettingControl(
                     onExpandedChange = { expanded = it }
                 ) {
                     OutlinedTextField(
-                        value = value.ifBlank { spec.options.firstOrNull().orEmpty() },
+                        value = value.ifBlank { spec.options.firstOrNull().orEmpty() }.uppercase(),
                         onValueChange = {},
                         readOnly = true,
                         modifier = Modifier
