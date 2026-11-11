@@ -138,7 +138,7 @@ object VisualizerVideoExporter {
             }
             for(i in 0 until total){val pts=i.toLong()*1_000_000/c.fps
                 val bi=(pts*a.sampleRate/(1024L*1_000_000)).toInt().coerceIn(0,a.bands.lastIndex)
-                gl.draw(a.bands[bi], c.visualizerLayers);EGLExt.eglPresentationTimeANDROID(gl.display,gl.surface,pts*1000)
+                gl.draw(a.bands[bi], c.visualizerLayers, pts / 1_000_000f);EGLExt.eglPresentationTimeANDROID(gl.display,gl.surface,pts*1000)
                 check(EGL14.eglSwapBuffers(gl.display,gl.surface));drain()
                 if(i%c.fps==0)progress(i.toFloat()/total)}
             codec.signalEndOfInputStream()
@@ -187,7 +187,7 @@ object VisualizerVideoExporter {
             buf=ByteBuffer.allocateDirect(64*36*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             GLES20.glViewport(0,0,w,h);GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
-        fun draw(bands: FloatArray, layers: List<VisualizerSettings>) {
+        fun draw(bands: FloatArray, layers: List<VisualizerSettings>, elapsedSeconds: Float) {
             val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
             val requiredFloats = configs.sumOf { layer ->
                 val segmentStyles = layer.segmentStyles.take(3).ifEmpty { listOf(BarSegmentStyle()) }
@@ -217,7 +217,7 @@ object VisualizerVideoExporter {
                 backgroundAlpha
             )
             if (composition.clearCanvas) GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-            val time = System.nanoTime() / 1_000_000_000.0
+            val time = elapsedSeconds.toDouble()
             val energy = bands.average().toFloat().coerceIn(0f, 1f)
             val beatPulse = ((energy - previousEnergy) * 4f).coerceIn(0f, 1f)
             if (beatPulse > 0.12f) lastBeatTimestamp = time
