@@ -296,13 +296,24 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform1f(roundPointHandle, 0f)
         GLES20.glUniform1f(pointSizeHandle, 1f)
         val vertexCount = offset / 6
-        if (config.rgbSplitAmount > 0f) {
+        val rgbGlitchActive = !config.rgbSplitOnBeat ||
+            (beatPulse > 0.02f && nowNanos - lastBeatNanos <= config.rgbGlitchDurationMs * 1_000_000f)
+        if (config.rgbSplitAmount > 0f && rgbGlitchActive) {
             val shift = 0.002f + config.rgbSplitAmount * 0.028f
-            GLES20.glUniform2f(offsetHandle, -shift, 0f)
-            GLES20.glUniform4f(tintHandle, 1f, 0.18f, 0.18f, 0.62f)
+            val angle = Math.toRadians(config.rgbSplitAngle.toDouble())
+            val directionX = cos(angle).toFloat()
+            val directionY = sin(angle).toFloat()
+            val redShift = shift * (1f + config.rgbRedOffset / 100f)
+            val greenShift = shift * (config.rgbGreenOffset / 100f)
+            val blueShift = shift * (1f + config.rgbBlueOffset / 100f)
+            GLES20.glUniform2f(offsetHandle, -directionX * redShift, -directionY * redShift)
+            GLES20.glUniform4f(tintHandle, 1f, 0f, 0f, 0.72f)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
-            GLES20.glUniform2f(offsetHandle, shift, 0f)
-            GLES20.glUniform4f(tintHandle, 0.18f, 0.85f, 1f, 0.62f)
+            GLES20.glUniform2f(offsetHandle, directionX * greenShift, directionY * greenShift)
+            GLES20.glUniform4f(tintHandle, 0f, 1f, 0f, 0.72f)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
+            GLES20.glUniform2f(offsetHandle, directionX * blueShift, directionY * blueShift)
+            GLES20.glUniform4f(tintHandle, 0f, 0f, 1f, 0.72f)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount)
         }
         GLES20.glUniform2f(offsetHandle, 0f, 0f)
