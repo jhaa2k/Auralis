@@ -399,20 +399,33 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         val rgbBlueOffset = rgbValue("blueOffset", 0f).coerceIn(-100f, 100f)
         val rgbGlitchOnBeat = rgbFlag("glitchOnBeat")
         val rgbGlitchDuration = rgbValue("glitchDuration", 250f).coerceIn(0f, 5000f)
-        val blurAmount = layers.firstOrNull { it.type == "BLUREFFECT" }?.let { effect ->
-            val effectKey = "layer_${effect.id}_${effect.type}"
-            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
-            if (enabled) {
-                val radius = (values["$effectKey.blurRadius"] ?: "2").toFloatOrNull() ?: 2f
-                val multiplier = (values["$effectKey.blurMultiplier"] ?: "4.1").toFloatOrNull() ?: 4.1f
-                (radius * multiplier / 100f).coerceIn(0f, 1f)
-            } else 0f
-        } ?: 0f
-        val motionBlurAmount = layers.firstOrNull { it.type == "MOTIONBLUREFFECT" }?.let { effect ->
-            val effectKey = "layer_${effect.id}_${effect.type}"
-            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
-            if (enabled) (values["$effectKey.blurAmount"] ?: "0.2").toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f else 0f
-        } ?: 0f
+        val blurEffect = layers.firstOrNull { it.type == "BLUREFFECT" }
+        val blurKey = blurEffect?.let { "layer_${it.id}_${it.type}" } ?: "BLUREFFECT"
+        val blurEnabled = (values["$blurKey.visible"] ?: values["BLUREFFECT.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+        val blurValue = if (blurEnabled && blurEffect != null) {
+            val radius = (values["$blurKey.blurRadius"] ?: values["BLUREFFECT.blurRadius"] ?: "2").toFloatOrNull() ?: 2f
+            val multiplier = (values["$blurKey.blurMultiplier"] ?: values["BLUREFFECT.blurMultiplier"] ?: "4.1").toFloatOrNull() ?: 4.1f
+            (radius * multiplier / 100f).coerceIn(0f, 1f)
+        } else 0f
+        val blurColor = runCatching {
+            android.graphics.Color.parseColor(values["$blurKey.color"] ?: values["BLUREFFECT.color"] ?: "#FFFFFFFF").toLong() and 0xFFFFFFFFL
+        }.getOrDefault(0xFFFFFFFFL)
+        val blurShowSharp = (values["$blurKey.showSharp"] ?: values["BLUREFFECT.showSharp"] ?: "true").toBooleanStrictOrNull() ?: true
+        val blurShowSharpUnder = (values["$blurKey.showSharpUnder"] ?: values["BLUREFFECT.showSharpUnder"] ?: "true").toBooleanStrictOrNull() ?: true
+
+        val motionEffect = layers.firstOrNull { it.type == "MOTIONBLUREFFECT" }
+        val motionKey = motionEffect?.let { "layer_${it.id}_${it.type}" } ?: "MOTIONBLUREFFECT"
+        val motionEnabled = (values["$motionKey.visible"] ?: values["MOTIONBLUREFFECT.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+        val motionBlurAmount = if (motionEnabled && motionEffect != null) {
+            (values["$motionKey.blurAmount"] ?: values["MOTIONBLUREFFECT.blurAmount"] ?: "0.2").toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f
+        } else 0f
+        val motionBlurSource = values["$motionKey.motionSource"] ?: values["MOTIONBLUREFFECT.motionSource"] ?: "EffectTransform"
+        val motionBlurRelative = (values["$motionKey.relativeMotion"] ?: values["MOTIONBLUREFFECT.relativeMotion"] ?: "true").toBooleanStrictOrNull() ?: true
+        val motionBlurColor = runCatching {
+            android.graphics.Color.parseColor(values["$motionKey.color"] ?: values["MOTIONBLUREFFECT.color"] ?: "#FFFFFFFF").toLong() and 0xFFFFFFFFL
+        }.getOrDefault(0xFFFFFFFFL)
+        val motionBlurShowSharp = (values["$motionKey.showSharp"] ?: values["MOTIONBLUREFFECT.showSharp"] ?: "true").toBooleanStrictOrNull() ?: true
+        val motionBlurShowSharpUnder = (values["$motionKey.showSharpUnder"] ?: values["MOTIONBLUREFFECT.showSharpUnder"] ?: "true").toBooleanStrictOrNull() ?: true
         return when (layer.type) {
             "COMPOSITION" -> VisualizerSettings(backgroundColor = compositionBackground, compositionAlpha = compositionAlpha, clearCanvas = clearCanvas, barsEnabled = false)
             "BARS" -> {
@@ -448,8 +461,16 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     sensitivity = number("maxHeightScale", 1f).coerceIn(0.1f, 4f),
                     smoothing = number("softness", 0.35f).coerceIn(0f, 0.95f),
                     opacity = number("alpha", 1f).coerceIn(0f, 1f),
-                    glow = blurAmount.coerceIn(0f, 1f),
+                    glow = blurValue.coerceIn(0f, 1f),
+                    blurColor = blurColor,
+                    blurShowSharp = blurShowSharp,
+                    blurShowSharpUnder = blurShowSharpUnder,
                     motionBlurAmount = motionBlurAmount,
+                    motionBlurSource = motionBlurSource,
+                    motionBlurRelativeMotion = motionBlurRelative,
+                    motionBlurColor = motionBlurColor,
+                    motionBlurShowSharp = motionBlurShowSharp,
+                    motionBlurShowSharpUnder = motionBlurShowSharpUnder,
                     positionX = number("positionX", 0.5f),
                     positionY = number("positionY", 0.5f),
                     scale = ((number("scaleX", 1f) + number("scaleY", 1f)) / 2f).coerceIn(0.1f, 3f),
