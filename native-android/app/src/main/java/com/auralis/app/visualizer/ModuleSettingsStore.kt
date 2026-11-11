@@ -50,8 +50,11 @@ class ModuleSettingsStore(application: Application) : AndroidViewModel(applicati
                 "barWidth" -> "0.72"
                 "barSpacing" -> "0.18"
                 "countLimit" -> "120"
-                "startSize", "fontSize" -> "30"
-                "speed" -> "1"
+                "startSize" -> "3"
+                "fontSize" -> "30"
+                "speed", "volume", "preamp" -> "1"
+                "lowerHz" -> "20"
+                "higherHz" -> "18000"
                 "amountX", "amountY" -> "0.8"
                 else -> when (spec.kind) {
                     SettingKind.CHECKBOX -> "false"
