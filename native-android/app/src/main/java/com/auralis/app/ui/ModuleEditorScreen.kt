@@ -1050,13 +1050,23 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
         val brightness = (values["$key.brightness"] ?: values["IMAGE.brightness"])?.toFloatOrNull() ?: 0f
         val contrast = ((values["$key.contrast"] ?: values["IMAGE.contrast"])?.toFloatOrNull() ?: 1f).coerceIn(0f, 3f)
         val saturation = ((values["$key.saturation"] ?: values["IMAGE.saturation"])?.toFloatOrNull() ?: 1f).coerceIn(0f, 3f)
+        val tint = runCatching {
+            Color(android.graphics.Color.parseColor(values["$key.tint"] ?: values["IMAGE.tint"] ?: "#FFFFFFFF"))
+        }.getOrDefault(Color.White)
         val offset = 0.5f * (1f - contrast) + brightness
         val colorMatrix = ColorMatrix(floatArrayOf(
-            contrast * (0.213f + 0.787f * saturation), contrast * (0.715f - 0.715f * saturation), contrast * (0.072f - 0.072f * saturation), 0f, offset,
-            contrast * (0.213f - 0.213f * saturation), contrast * (0.715f + 0.285f * saturation), contrast * (0.072f - 0.072f * saturation), 0f, offset,
-            contrast * (0.213f - 0.213f * saturation), contrast * (0.715f - 0.715f * saturation), contrast * (0.072f + 0.928f * saturation), 0f, offset,
-            0f, 0f, 0f, 1f, 0f
+            contrast * (0.213f + 0.787f * saturation) * tint.red, contrast * (0.715f - 0.715f * saturation) * tint.red, contrast * (0.072f - 0.072f * saturation) * tint.red, 0f, offset * tint.red,
+            contrast * (0.213f - 0.213f * saturation) * tint.green, contrast * (0.715f + 0.285f * saturation) * tint.green, contrast * (0.072f - 0.072f * saturation) * tint.green, 0f, offset * tint.green,
+            contrast * (0.213f - 0.213f * saturation) * tint.blue, contrast * (0.715f - 0.715f * saturation) * tint.blue, contrast * (0.072f + 0.928f * saturation) * tint.blue, 0f, offset * tint.blue,
+            0f, 0f, 0f, tint.alpha, 0f
         ))
+        val keepAspect = (values["$key.keepAspect"] ?: values["IMAGE.keepAspect"] ?: "true").toBooleanStrictOrNull() != false
+        val cropToFit = (values["$key.cropToFit"] ?: values["IMAGE.cropToFit"] ?: "false").toBooleanStrictOrNull() == true
+        val imageContentScale = when {
+            cropToFit -> androidx.compose.ui.layout.ContentScale.Crop
+            keepAspect -> androidx.compose.ui.layout.ContentScale.Fit
+            else -> androidx.compose.ui.layout.ContentScale.FillBounds
+        }
         Box(
             modifier = Modifier.align(Alignment.Center).offset {
                 IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight).toInt())
@@ -1068,7 +1078,7 @@ private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, Strin
                 bitmap = bitmap!!.asImageBitmap(),
                 contentDescription = layer.name,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = if ((values["$key.keepAspect"] ?: "true").toBooleanStrictOrNull() != false) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop,
+                contentScale = imageContentScale,
                 colorFilter = ColorFilter.colorMatrix(colorMatrix)
             )
         }
