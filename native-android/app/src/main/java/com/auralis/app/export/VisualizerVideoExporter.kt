@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.*
 import com.auralis.app.visualizer.VisualizerSettings
+import com.auralis.app.visualizer.BarSegmentStyle
 
 data class VideoExportConfig(
     val width: Int = 1920, val height: Int = 1080, val fps: Int = 30,
