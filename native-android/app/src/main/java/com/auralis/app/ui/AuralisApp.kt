@@ -908,7 +908,7 @@ fun AuralisApp() {
                 values = modulePropertyValues,
                 onBack = { detailsModule = null },
                 onReset = {
-                    modulePropertyValues.keys.filter { it.startsWith("\$detailsLayerId/") }.forEach { modulePropertyValues.remove(it) }
+                    modulePropertyValues.keys.filter { it.startsWith("$detailsLayerId/") }.forEach { modulePropertyValues.remove(it) }
                     val resetIndex = editorLayers.indexOfFirst { it.id == detailsLayerId }
                     if (resetIndex >= 0) {
                         val current = editorLayers[resetIndex]
