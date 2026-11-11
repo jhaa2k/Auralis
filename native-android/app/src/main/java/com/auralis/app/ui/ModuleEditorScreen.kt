@@ -373,11 +373,20 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         } ?: "None"
         val globalMirrorX = mirrorMode in listOf("Vertical", "Both", "Kaleidoscope")
         val globalMirrorY = mirrorMode in listOf("Horizontal", "Both", "Kaleidoscope")
-        val rgbAmount = layers.firstOrNull { it.type == "RGBSPLITEFFECT" }?.let { effect ->
-            val effectKey = "layer_${effect.id}_${effect.type}"
-            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
-            if (enabled) (values["$effectKey.splitAmount"] ?: values["RGBSPLITEFFECT.splitAmount"])?.toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f else 0f
-        } ?: 0f
+        val rgbEffect = layers.firstOrNull { it.type == "RGBSPLITEFFECT" }
+        val rgbKey = rgbEffect?.let { "layer_${it.id}_${it.type}" } ?: "RGBSPLITEFFECT"
+        val rgbEnabled = (values["$rgbKey.visible"] ?: values["RGBSPLITEFFECT.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+        fun rgbValue(name: String, fallback: Float) =
+            (values["$rgbKey.$name"] ?: values["RGBSPLITEFFECT.$name"])?.toFloatOrNull() ?: fallback
+        fun rgbFlag(name: String, fallback: Boolean = false) =
+            (values["$rgbKey.$name"] ?: values["RGBSPLITEFFECT.$name"])?.toBooleanStrictOrNull() ?: fallback
+        val rgbAmount = if (rgbEffect != null && rgbEnabled) rgbValue("splitAmount", 0f).coerceIn(0f, 1f) else 0f
+        val rgbAngle = rgbValue("angle", 0f).coerceIn(0f, 360f)
+        val rgbRedOffset = rgbValue("redOffset", 0f).coerceIn(-100f, 100f)
+        val rgbGreenOffset = rgbValue("greenOffset", 0f).coerceIn(-100f, 100f)
+        val rgbBlueOffset = rgbValue("blueOffset", 0f).coerceIn(-100f, 100f)
+        val rgbGlitchOnBeat = rgbFlag("glitchOnBeat")
+        val rgbGlitchDuration = rgbValue("glitchDuration", 250f).coerceIn(0f, 5000f)
         val blurAmount = layers.firstOrNull { it.type == "BLUREFFECT" }?.let { effect ->
             val effectKey = "layer_${effect.id}_${effect.type}"
             val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
@@ -424,6 +433,12 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     measureAmount = number("measureAmount", 0.5f),
                     beatSensitivity = number("beatRangeValueLower", 0.55f).coerceIn(0f, 1f),
                     rgbSplitAmount = rgbAmount,
+                    rgbSplitAngle = rgbAngle,
+                    rgbRedOffset = rgbRedOffset,
+                    rgbGreenOffset = rgbGreenOffset,
+                    rgbBlueOffset = rgbBlueOffset,
+                    rgbSplitOnBeat = rgbGlitchOnBeat,
+                    rgbGlitchDurationMs = rgbGlitchDuration,
                     barsEnabled = visible
                 )
             }
