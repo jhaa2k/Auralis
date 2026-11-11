@@ -398,7 +398,7 @@ fun AuralisApp() {
                     )
                     editorLayers.filter { it.type == "Text" && it.visible && it.textContent.isNotBlank() }.forEach { textLayer ->
                         Text(
-                            text = textLayer.textContent,
+                            text = textLayer.textContent.replace("%title%", selectedTrackName ?: textLayer.songTitle).replace("%artist%", textLayer.artistName).replace("%time%", formatTime(playbackPosition)).replace("%duration%", formatTime(playbackDuration)),
                             color = Color(textLayer.textColor).copy(alpha = textLayer.opacity),
                             fontSize = textLayer.fontSize.sp,
                             modifier = Modifier
@@ -684,6 +684,14 @@ fun AuralisApp() {
                                     }
                                     "COLOR" -> {
                                         Text("TEXT COLOR PRESETS", color = StudioMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        if (selected.type == "Particles") {
+                                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                listOf(0xFFFFFFFF, 0xFFFF8A5B, 0xFF59D6FF, 0xFFB58CFF, 0xFF70E0A0, 0xFFFFD166).forEach { argb ->
+                                                    Surface(modifier = Modifier.size(27.dp), color = Color(argb), shape = RoundedCornerShape(2.dp), border = BorderStroke(1.dp, StudioLine), onClick = { editorLayers[selectedIndex] = selected.copy(particleColor = argb) }) {}
+                                                }
+                                            }
+                                            PropertyInfoRow("Particle color", "Preset palette")
+                                        }
                                         if (selected.type == "Text") {
                                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                                 listOf(0xFFFFFFFF, 0xFFFF8A5B, 0xFF59D6FF, 0xFFB58CFF, 0xFF70E0A0, 0xFFFFD166).forEach { argb ->
@@ -1061,7 +1069,7 @@ private data class EditorLayer(
     val imageFitMode: String = "KEEP_ASPECT_RATIO",
     val imageSourceMode: String = "GENERATED_ALBUM_ART",
     val blurIntensity: Float = 0.15f,
-    val particleTransparency: Float = 1f,
+    val particleTransparency: Float = 1f,\n    val particleColor: Long = 0xFFFFFFFF,
     val particleVectorAngle: Float = 0f,
     val barsSpeed: Float = 1f,
     val beatAmount: Float = 0.5f,
