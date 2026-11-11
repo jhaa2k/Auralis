@@ -13,7 +13,67 @@ object ModuleCatalog {
     val shapes = "None,Circle,SidedPolygon,Line,HorizontalLine,VerticalLine,Rectangle,Square,Triangle,Star,Heart,WaveformPath,CustomPath,Oval,Capsule,Pentagon,Hexagon".split(",")
     val measures = "Nothing,Beat,TotalTime,TotalTimeBackward,TotalTimeWhenPlaying,TotalTimeAndBeat,TrackPosition,BeatRandomShake,BeatCamShakeRotMore,BeatCamShakeRotLess,ConstantShakeRotMore,ConstantShakeRotLess,BeatTriggerAnim,BeatCamShakeOnly,BeatPulseScale,BeatFlashColor,BeatGlowIntensity,BeatHorizontalStretch,BeatVerticalBounce,ConstantSlowRotate,ConstantOrbitMove,ConstantLinearScroll,TrackProgressPercentage,TrackRemainingTime,TrackIntroOutroTrigger,VolumeLevelResponsive,PitchFrequencyResponsive".split(",")
     val fullBlend = blendModes
-    private fun s(key:String, label:String, kind:SettingKind=SettingKind.SLIDER, min:Float=0f, max:Float=1f, options:List<String> = emptyList(), default:String="") = SettingSpec(key,label,kind,options,min,max,default)
+    private fun defaultRange(key: String): Pair<Float, Float> = when (key) {
+        "positionX", "positionY", "alignmentX", "alignmentY", "pivotX", "pivotY" -> 0f to 1f
+        "scaleX", "scaleY", "particleScale" -> 0.1f to 4f
+        "alpha", "opacity", "opacityStrength", "threshold", "softness", "colorBlendOffset",
+        "barSpacing", "blurAmount", "splitAmount", "relativeMotion" -> 0f to 1f
+        "barCount" -> 16f to 512f
+        "barWidth" -> 0.05f to 1f
+        "heightScale", "maxHeightScale" -> 0f to 4f
+        "minHeightScale" -> 0f to 1f
+        "rotation", "angle", "vectorAngle", "vectorAngleZ" -> 0f to 360f
+        "fixedHeight", "segment1FixedHeight", "segment2FixedHeight", "segment3FixedHeight" -> 0f to 4f
+        "segment1HeightMultiplier", "segment2HeightMultiplier", "segment3HeightMultiplier" -> 0f to 5f
+        "reactionDelay", "reactionAccumulatedDelay" -> 0f to 1000f
+        "countLimit" -> 0f to 5000f
+        "perspectiveDepth" -> 1f to 2000f
+        "perspectiveFov" -> 1f to 180f
+        "trailLength" -> 0f to 50f
+        "fadeInOut", "fadeInOutTime" -> 0f to 10f
+        "sizeAspectRatio" -> 0.1f to 5f
+        "startSize", "fadeInSize", "endSize", "endSizeRandom" -> 0f to 100f
+        "endSizeZFactor" -> 0f to 10f
+        "nearCameraFade" -> 0f to 1000f
+        "spawnTime" -> 0f to 10f
+        "amountX", "amountY" -> 0f to 10f
+        "speed", "speedRandom" -> 0f to 10f
+        "lifetime" -> 0.1f to 120f
+        "sideSineFreq", "sideSineFreqRandom" -> 0f to 50f
+        "sideSineMag", "sideSineMagRandom" -> 0f to 10f
+        "volume" -> 0f to 2f
+        "preamp" -> 0f to 10f
+        "typewriterSpeed", "animationSpeed" -> 0.1f to 20f
+        "fontSize" -> 6f to 300f
+        "letterSpacing" -> -2f to 10f
+        "lineHeight" -> 0.5f to 3f
+        "shadowX", "shadowY" -> -100f to 100f
+        "shadowBlur" -> 0f to 100f
+        "outlineWidth" -> 0f to 20f
+        "brightness" -> -1f to 1f
+        "contrast", "saturation" -> 0f to 3f
+        "blurRadius" -> 0f to 100f
+        "blurMultiplier" -> 0f to 10f
+        "glitchDuration" -> 0f to 5000f
+        "redOffset", "greenOffset", "blueOffset" -> -100f to 100f
+        "offset" -> -1f to 1f
+        "bpmSync" -> 1f to 300f
+        "audioOffset" -> -5000f to 5000f
+        "beatOffset" -> -10f to 10f
+        "gravityX", "gravityY" -> -10f to 10f
+        "resolutionWidth", "resolutionHeight" -> 1f to 8192f
+        "imageIndex", "sourceCompositionIndex", "audioProviderIndex" -> 0f to 999f
+        else -> 0f to 1f
+    }
+    private fun s(
+        key: String,
+        label: String,
+        kind: SettingKind = SettingKind.SLIDER,
+        min: Float = defaultRange(key).first,
+        max: Float = defaultRange(key).second,
+        options: List<String> = emptyList(),
+        default: String = ""
+    ) = SettingSpec(key, label, kind, options, min, max, default)
     private fun general() = SettingGroup("General", listOf(
         s("tag","Tag",SettingKind.TEXT), s("visible","Visible",SettingKind.CHECKBOX,default="true"),
         s("blendMode","Blend Mode",SettingKind.DROPDOWN,options=blendModes,default="Alpha"),
