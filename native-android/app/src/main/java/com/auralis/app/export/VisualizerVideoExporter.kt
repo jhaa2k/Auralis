@@ -183,17 +183,70 @@ object VisualizerVideoExporter {
             val vs="attribute vec2 p;attribute vec4 c;varying vec4 v;void main(){gl_Position=vec4(p,0.,1.);v=c;}"
             val fs="precision mediump float;varying vec4 v;void main(){gl_FragColor=v;}"
             program=link(shader(GLES20.GL_VERTEX_SHADER,vs),shader(GLES20.GL_FRAGMENT_SHADER,fs));p=GLES20.glGetAttribLocation(program,"p");col=GLES20.glGetAttribLocation(program,"c")
-            buf=ByteBuffer.allocateDirect(64*36*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+            buf=ByteBuffer.allocateDirect((128*32*36*8 + 400*36*8)*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             GLES20.glViewport(0,0,w,h);GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
-        fun draw(bands:FloatArray) {
-            GLES20.glClearColor(.018f,.02f,.028f,1f);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);buf.clear()
-            for(i in bands.indices){val l=-1f+2f*i/bands.size;val r=-1f+2f*(i+.78f)/bands.size;val top=-.88f+.025f+bands[i]*.82f
-                val red=.2f+.72f*i/bands.size;val green=.82f-.4f*i/bands.size;val blue=.98f-.48f*i/bands.size
-                buf.put(floatArrayOf(l,-.88f,red,green,blue,1f,r,-.88f,red,green,blue,1f,r,top,red,green,blue,1f,l,-.88f,red,green,blue,1f,r,top,red,green,blue,1f,l,top,red,green,blue,1f))}
-            buf.position(0);GLES20.glUseProgram(program);GLES20.glEnableVertexAttribArray(p);GLES20.glEnableVertexAttribArray(col)
-            GLES20.glVertexAttribPointer(p,2,GLES20.GL_FLOAT,false,24,buf);buf.position(2);GLES20.glVertexAttribPointer(col,4,GLES20.GL_FLOAT,false,24,buf)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,bands.size*6);GLES20.glDisableVertexAttribArray(p);GLES20.glDisableVertexAttribArray(col)
+        fun draw(bands: FloatArray, layers: List<VisualizerSettings>) {
+            GLES20.glClearColor(.018f,.02f,.028f,1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            buf.clear()
+            val configs = layers.ifEmpty { listOf(VisualizerSettings()) }
+            val time = System.nanoTime() / 1_000_000_000.0
+            fun quad(left: Float, bottom: Float, right: Float, top: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings) {
+                val angle = Math.toRadians(config.rotation.toDouble())
+                val cs = cos(angle).toFloat(); val sn = sin(angle).toFloat()
+                val cx = (config.positionX - .5f) * 2f; val cy = (.5f - config.positionY) * 2f
+                val pts = floatArrayOf(left,bottom,right,bottom,right,top,left,bottom,right,top,left,top)
+                for (i in 0 until 6) {
+                    val x = pts[i*2] * config.scale; val y = pts[i*2+1] * config.scale
+                    buf.put(x*cs-y*sn+cx); buf.put(x*sn+y*cs+cy)
+                    buf.put(red); buf.put(green); buf.put(blue); buf.put(alpha)
+                }
+            }
+            configs.forEach { config ->
+                if (config.barsEnabled) {
+                    val count = config.barCount.coerceIn(16,128)
+                    val slot = 2f/count; val width = slot*config.barWidth.coerceIn(.15f,1f)
+                    val gap = config.segmentGap.coerceIn(0f,.45f); val segments = config.segmentCount.coerceIn(1,32)
+                    for (i in 0 until count) {
+                        val progress = i.toFloat()/(count-1).coerceAtLeast(1)
+                        val index = ((if(config.flipInput) 1f-progress else progress)*(bands.size-1)).toInt().coerceIn(0,bands.lastIndex)
+                        val height = (config.barMinHeight + bands[index]*config.sensitivity*config.barHeight*.88f).coerceIn(.005f,1.5f)
+                        val from = config.barColorFrom; val to = config.barColorTo
+                        fun channel(shift:Int) = ((((from shr shift) and 255).toFloat() + (((to shr shift) and 255).toFloat()-((from shr shift) and 255).toFloat())*progress)/255f)
+                        val r=channel(16); val g=channel(8); val bl=channel(0); val alpha=config.opacity*channel(24)
+                        val left=-1f+i*slot+(slot-width)*.5f; val right=left+width; val base=-.94f
+                        val segH=height/segments
+                        for (segment in 0 until segments) {
+                            val bottom=base+segment*segH+segH*gap*.5f
+                            val top=base+(segment+1)*segH-segH*gap*.5f
+                            if(top>bottom) { quad(left,bottom,right,top,r,g,bl,alpha,config); if(config.mirror) quad(left,-top,right,-bottom,r,g,bl,alpha,config) }
+                        }
+                    }
+                }
+                if (config.particlesEnabled) {
+                    val count=config.particleCount.coerceIn(0,400)
+                    for(i in 0 until count) {
+                        val seed=i.toFloat(); val phase=((time*config.particleSpeed*.12+seed*.6180339)%1.0).toFloat()
+                        val angle=seed*2.3999632f; val radius=(.12f+(seed*.7548776f%1f)*config.particleSpread)*(.65f+bands.average().toFloat()*.75f)
+                        val x=cos((angle+time.toFloat()*.1*config.particleSpeed)).toFloat()*radius
+                        val y=phase*2f-1f+sin((angle*1.7f+time.toFloat()*.4)).toFloat()*.08f
+                        val half=(config.particleSize.coerceIn(1f,12f)/160f)*config.particleScale
+                        val color=config.particleColor
+                        val alpha=config.particleOpacity*(((color shr 24) and 255).toFloat()/255f)
+                        quad(x-half,y-half,x+half,y+half,((color shr 16) and 255)/255f,((color shr 8) and 255)/255f,(color and 255)/255f,alpha,config)
+                    }
+                }
+            }
+            val vertices=buf.position()/6
+            buf.position(0)
+            GLES20.glUseProgram(program)
+            GLES20.glEnableVertexAttribArray(p); GLES20.glEnableVertexAttribArray(col)
+            GLES20.glVertexAttribPointer(p,2,GLES20.GL_FLOAT,false,24,buf)
+            buf.position(2)
+            GLES20.glVertexAttribPointer(col,4,GLES20.GL_FLOAT,false,24,buf)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices)
+            GLES20.glDisableVertexAttribArray(p); GLES20.glDisableVertexAttribArray(col)
         }
         fun release(){EGL14.eglMakeCurrent(display,EGL14.EGL_NO_SURFACE,EGL14.EGL_NO_SURFACE,EGL14.EGL_NO_CONTEXT);EGL14.eglDestroySurface(display,surface);EGL14.eglDestroyContext(display,context);EGL14.eglTerminate(display)}
         private fun shader(type:Int,src:String):Int{val s=GLES20.glCreateShader(type);GLES20.glShaderSource(s,src);GLES20.glCompileShader(s);val ok=IntArray(1);GLES20.glGetShaderiv(s,GLES20.GL_COMPILE_STATUS,ok,0);check(ok[0]==GLES20.GL_TRUE){GLES20.glGetShaderInfoLog(s)};return s}
