@@ -33,7 +33,9 @@ data class VisualizerSettings(
     val particleMeasureAmount: Float = 0.5f,
     val rgbSplitAmount: Float = 0f,
     val barWidth: Float = 0.72f,
-    val barHeight: Float = 1f
+    val barHeight: Float = 1f,
+    val segmentCount: Int = 1,
+    val segmentGap: Float = 0.18f
 ) {
     fun sanitized() = copy(
         barCount = barCount.coerceIn(16, 128),
@@ -60,6 +62,8 @@ data class VisualizerSettings(
         particleMeasureAmount = particleMeasureAmount.coerceIn(0f, 1f),
         rgbSplitAmount = rgbSplitAmount.coerceIn(0f, 1f),
         barWidth = barWidth.coerceIn(0.15f, 1f),
-        barHeight = barHeight.coerceIn(0.1f, 2f)
+        barHeight = barHeight.coerceIn(0.1f, 2f),
+        segmentCount = segmentCount.coerceIn(1, 32),
+        segmentGap = segmentGap.coerceIn(0f, 0.45f)
     )
 }
