@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -1104,17 +1105,31 @@ private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String
         val shadowY = (value("shadowY", "0").toFloatOrNull() ?: 0f).coerceIn(-100f, 100f)
         val shadowBlur = (value("shadowBlur", "0").toFloatOrNull() ?: 0f).coerceIn(0f, 100f)
         val lineHeight = (value("lineHeight", "1").toFloatOrNull() ?: 1f).coerceIn(0.5f, 3f)
+        val outlineWidth = (value("outlineWidth", "0").toFloatOrNull() ?: 0f).coerceIn(0f, 20f)
+        val outlineColor = runCatching { Color(android.graphics.Color.parseColor(value("outlineColor", "#FF000000"))) }.getOrDefault(Color.Black)
         val textStyle = TextStyle(
             shadow = if (shadowColor.alpha > 0f && (shadowX != 0f || shadowY != 0f || shadowBlur > 0f))
                 Shadow(shadowColor, Offset(shadowX, shadowY), shadowBlur) else null,
             lineHeight = (size * lineHeight).sp
         )
+        val outlineTextStyle = textStyle.copy(drawStyle = Stroke(width = outlineWidth))
         Box(
             modifier = Modifier.align(Alignment.Center).offset {
                 IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight + animationOffset).toInt())
             }.graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f) * animationScale, scaleY = sy.coerceIn(0.05f, 8f) * animationScale, rotationZ = rotation, alpha = opacity * animationAlpha),
             contentAlignment = Alignment.Center
         ) {
+            if (outlineWidth > 0f) {
+                Text(
+                    text = animatedText, color = outlineColor, fontSize = size.sp,
+                    fontFamily = typeface?.let { FontFamily(it) } ?: FontFamily.SansSerif,
+                    fontStyle = if (isItalic) FontStyle.Italic else FontStyle.Normal,
+                    fontWeight = weight,
+                    textAlign = alignment,
+                    letterSpacing = (value("letterSpacing", "0").toFloatOrNull() ?: 0f).sp,
+                    style = outlineTextStyle
+                )
+            }
             Text(
                 text = animatedText, color = color, fontSize = size.sp,
                 fontFamily = typeface?.let { FontFamily(it) } ?: FontFamily.SansSerif,
