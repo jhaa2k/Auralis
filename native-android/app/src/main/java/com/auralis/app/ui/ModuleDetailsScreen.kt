@@ -221,7 +221,19 @@ internal fun ModuleDetailsScreen(
                                                     label={Text(when(field.kind){SettingKind.COLOR->"Hex color (#RRGGBB or #AARRGGBB)";SettingKind.IMAGE->"Image URI / selected asset";SettingKind.NUMBER->"Numeric value";SettingKind.CODE->"GLSL source";else->"Value"},fontSize=8.sp)},
                                                     colors=OutlinedTextFieldDefaults.colors(focusedTextColor=StudioWhite,unfocusedTextColor=StudioWhite,focusedBorderColor=StudioAccent,unfocusedBorderColor=StudioLine,focusedLabelColor=StudioAccent,unfocusedLabelColor=StudioMuted))
                                                 if(field.kind==SettingKind.IMAGE) TextButton(onClick={onPickImage(field.name)}) { Text("CHOOSE IMAGE",color=StudioAccent,fontSize=8.sp) }
-                                                if(field.kind==SettingKind.COLOR) Text("Stored as HEX: $value",color=StudioMuted,fontSize=8.sp)
+                                                if(field.kind==SettingKind.COLOR) {
+                                                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically) {
+                                                        listOf("#FFFFFFFF","#FF000000","#FFFF3B30","#FF34C759","#FF007AFF","#FF00D9FF","#FFFF2D95","#FFFFCC00").forEach { hex ->
+                                                            Surface(
+                                                                modifier=Modifier.size(22.dp).clickable { write(field,hex) },
+                                                                color=runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(StudioWhite),
+                                                                border=BorderStroke(1.dp,StudioLine),
+                                                                shape=RoundedCornerShape(2.dp)
+                                                            ) {}
+                                                        }
+                                                    }
+                                                    Text("HEX OUTPUT: \$value",color=StudioMuted,fontSize=8.sp)
+                                                }
                                             }
                                         }
                                     }
