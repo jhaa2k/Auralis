@@ -297,7 +297,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         GLES20.glUniform1f(pointSizeHandle, 1f)
         val vertexCount = offset / 6
         val rgbGlitchActive = !config.rgbSplitOnBeat ||
-            (beatPulse > 0.02f && nowNanos - lastBeatNanos <= config.rgbGlitchDurationMs * 1_000_000f)
+            (beatPulse > 0.02f && nowNanos - lastBeatNanos <= config.rgbGlitchDurationMs.toLong() * 1_000_000L)
         if (config.rgbSplitAmount > 0f && rgbGlitchActive) {
             val shift = 0.002f + config.rgbSplitAmount * 0.028f
             val angle = Math.toRadians(config.rgbSplitAngle.toDouble())
