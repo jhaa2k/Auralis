@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -104,6 +105,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.debounce
 import java.util.Locale
 
 @Composable
@@ -133,6 +137,17 @@ fun AuralisApp() {
     var detailsLayerId by remember { mutableIntStateOf(-1) }
     val modulePropertyValues = remember { mutableStateMapOf<String, String>() }
     var pendingImageField by remember { mutableStateOf("Pick Image") }
+
+    // Restore the per-layer property dictionary once, then persist edits with a short debounce.
+    LaunchedEffect(context) {
+        modulePropertyValues.putAll(restoreModuleProperties(context))
+    }
+    LaunchedEffect(context) {
+        snapshotFlow { modulePropertyValues.toMap() }
+            .drop(1)
+            .debounce(450)
+            .collectLatest { persistModuleProperties(context, it) }
+    }
     var nextLayerId by remember { mutableIntStateOf(3) }
     var addLayerMenuExpanded by remember { mutableStateOf(false) }
     var fftLower by remember { mutableFloatStateOf(0.02f) }
