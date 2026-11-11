@@ -101,6 +101,7 @@ object ModuleCatalog {
             "blurRadius" -> "2"
             "blurMultiplier" -> "4.1"
             "blurAmount" -> "0.2"
+            "glitchDuration" -> "250"
             "lowerHz" -> "20"
             "higherHz" -> "18000"
             "bpmSync" -> "120"
