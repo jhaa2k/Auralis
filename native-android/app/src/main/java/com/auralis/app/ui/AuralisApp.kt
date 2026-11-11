@@ -869,7 +869,7 @@ fun AuralisApp() {
     // A full-screen property route sits above the studio and keeps values keyed by layer ID.
     val activeModule = detailsModule
     if (activeModule != null && detailsLayerId > 0) {
-        Dialog(onDismissRequest = { detailsModule = null }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        Dialog(onDismissRequest = { detailsModule = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             ModuleDetailsScreen(
                 module = activeModule,
                 layerId = detailsLayerId,
