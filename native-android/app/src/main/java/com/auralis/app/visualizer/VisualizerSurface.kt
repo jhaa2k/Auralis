@@ -13,6 +13,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.min
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 class VisualizerSurface(context: Context) : GLSurfaceView(context) {
     private val visualizerRenderer = SpectrumGlRenderer()
@@ -286,12 +287,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 (if (config.particleMirrorX && config.particleMirrorY) 1 else 0)
             val tailCopies = if (config.particleTrailLength > 0f) 3 else 1
             val requiredFloats = config.particleCount * mirrorCopies * tailCopies * 6
-            var points = particleBuffer
-            if (points == null || points.capacity() < requiredFloats) {
-                points = ByteBuffer.allocateDirect(requiredFloats * 4)
-                    .order(ByteOrder.nativeOrder()).asFloatBuffer()
-                particleBuffer = points
-            }
+            val points = particleBuffer?.takeIf { it.capacity() >= requiredFloats }
+                ?: ByteBuffer.allocateDirect(requiredFloats.coerceAtLeast(6) * 4)
+                    .order(ByteOrder.nativeOrder()).asFloatBuffer().also { particleBuffer = it }
             points.clear()
             var renderedParticleCount = 0
             val now = System.nanoTime() / 1_000_000_000.0
