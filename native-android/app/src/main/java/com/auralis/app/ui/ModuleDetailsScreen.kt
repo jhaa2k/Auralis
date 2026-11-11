@@ -145,7 +145,7 @@ private val modules: Map<String,ModuleSpec> = listOf(
     ))))
 ).associateBy { it.title }
 
-/** Full-screen details editor. Each layer owns its values through the stable layerId.key namespace. */
+/** Full-screen details editor. All sections start collapsed; only one category can be expanded at a time. Each layer owns values through the stable layerId.key namespace. */
 @Composable
 internal fun ModuleDetailsScreen(
     module: String,
@@ -157,7 +157,7 @@ internal fun ModuleDetailsScreen(
     onPropertyChange: (String, String, String) -> Unit
 ) {
     val spec = modules[module] ?: modules["BARS"]!!
-    var expanded by remember(module, layerId) { mutableStateOf(spec.groups.firstOrNull()?.title.orEmpty()) }
+    var expanded by remember(module, layerId) { mutableStateOf("") }
     var info by remember { mutableStateOf(false) }
     val prefix = "$layerId/"
     fun read(group: AccordionSpec, field: SettingSpec): String {
