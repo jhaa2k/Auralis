@@ -141,18 +141,24 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val vertices = FloatArray(count * 66 * 6 * 6)
         var offset = 0
         for (i in 0 until count) {
-            val sourceIndex = (i.toFloat() / count * data.size).toInt().coerceIn(0, data.lastIndex)
+            val progress = i.toFloat() / (count - 1).coerceAtLeast(1)
+            val sourceProgress = if (config.flipInput) 1f - progress else progress
+            val sourceIndex = (sourceProgress * (data.size - 1)).toInt().coerceIn(0, data.lastIndex)
             val raw = (data[sourceIndex] * config.sensitivity).coerceIn(0f, 1f)
-            val height = ((0.025f + raw * 0.88f) * config.barHeight).coerceIn(0.025f, 1.5f)
+            val height = ((config.barMinHeight + raw * (0.88f * config.barHeight)).coerceAtLeast(0.005f)).coerceIn(0.005f, 1.5f)
             val x0 = -1f + i * slot + horizontalInset
             val x1 = min(1f, x0 + barWidth)
             val y0 = -0.94f
             val y1 = y0 + height
-            val hue = i.toFloat() / count
-            val red = (0.15f + 0.75f * hue).coerceIn(0f, 1f)
-            val green = (0.72f - 0.35f * hue).coerceIn(0f, 1f)
-            val blue = (0.95f - 0.55f * hue).coerceIn(0f, 1f)
-            val alpha = config.opacity
+            fun channel(shift: Int): Float {
+                val from = ((config.barColorFrom shr shift) and 0xFF).toFloat()
+                val to = ((config.barColorTo shr shift) and 0xFF).toFloat()
+                return (from + (to - from) * progress) / 255f
+            }
+            val red = channel(16)
+            val green = channel(8)
+            val blue = channel(0)
+            val alpha = config.opacity * channel(24)
             fun appendQuad(left: Float, bottom: Float, right: Float, top: Float, a: Float) {
                 val points = floatArrayOf(
                     left,bottom, right,bottom, right,top,
@@ -250,10 +256,10 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val alpha = (config.particleOpacity * (0.30f + energy * 0.70f) * (0.45f + ((seed * 0.31f) % 0.55f))).coerceIn(0f, 1f)
                 points.put(x)
                 points.put(y)
-                points.put(0.48f + energy * 0.30f)
-                points.put(0.78f + energy * 0.18f)
-                points.put(1f)
-                points.put(alpha)
+                points.put(((config.particleColor shr 16) and 0xFF).toFloat() / 255f)
+                points.put(((config.particleColor shr 8) and 0xFF).toFloat() / 255f)
+                points.put((config.particleColor and 0xFF).toFloat() / 255f)
+                points.put(alpha * (((config.particleColor shr 24) and 0xFF).toFloat() / 255f))
             }
             points.position(0)
             GLES20.glUniform1f(roundPointHandle, 1f)
