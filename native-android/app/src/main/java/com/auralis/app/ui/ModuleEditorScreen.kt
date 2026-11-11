@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -86,7 +88,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     var playbackDuration by remember { mutableLongStateOf(0L) }
     var audioStatus by remember { mutableStateOf("PLAYER READY") }
     var previewAspectRatio by remember { mutableStateOf("16:9") }
-    var expandedGroup by remember(selectedModuleId) { mutableStateOf("General") }
+    var expandedGroup by remember(selectedModuleId) { mutableStateOf<String?>("General") }
     var showModuleInfo by remember { mutableStateOf(false) }
 
     var exportResolution by remember { mutableStateOf("1080p") }
@@ -499,8 +501,9 @@ private fun EditorBottomNavigation(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(62.dp)
             .background(EditorPanel)
+            .navigationBarsPadding()
+            .height(62.dp)
             .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly
@@ -998,6 +1001,7 @@ private fun AudioPanel(
         modifier = Modifier
             .fillMaxSize()
             .background(EditorBackground)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(
@@ -1156,11 +1160,12 @@ private fun ExportPanel(
         modifier = Modifier
             .fillMaxSize()
             .background(EditorBackground)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .clip(RoundedCornerShape(5.dp))
                 .background(EditorPanel)
                 .padding(12.dp)
@@ -1542,10 +1547,10 @@ private fun String.toAspectRatio(): Float = when (this) {
 
 private fun exportDimensions(resolution: String, aspectRatio: String): Pair<Int, Int> {
     val longEdge = when (resolution) {
-        "720p" -> 720
-        "1440p" -> 1440
-        "2160p" -> 2160
-        else -> 1080
+        "720p" -> 1280
+        "1080p" -> 1920
+        "1440p" -> 2560
+        else -> 3840
     }
     val raw = when (aspectRatio) {
         "9:16" -> (longEdge * 9f / 16f).roundToInt() to longEdge
