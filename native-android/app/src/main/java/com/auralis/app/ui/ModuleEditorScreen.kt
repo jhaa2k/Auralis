@@ -8,6 +8,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +34,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,7 +70,7 @@ private val EditorSuccess = Color(0xFF75C99B)
 
 private enum class EditorTab(val label: String, val icon: ImageVector) {
     STUDIO("Studio", Icons.Outlined.GraphicEq),
-    ELEMENTS("Elements", Icons.Outlined.Layers),
+    ELEMENTS("Layers", Icons.Outlined.Layers),
     AUDIO("Audio", Icons.Outlined.AudioFile),
     EXPORT("Export", Icons.Outlined.FileDownload)
 }
@@ -76,9 +82,27 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
     val scope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf(EditorTab.STUDIO) }
     var selectedModuleId by remember { mutableStateOf("BARS") }
+    var layers by remember { mutableStateOf(listOf(SavedLayerRecord(1, "BARS", "Bars 1"))) }
+    var layersLoaded by remember { mutableStateOf(false) }
+    var selectedLayerId by remember { mutableIntStateOf(1) }
+    val selectedLayer = layers.firstOrNull { it.id == selectedLayerId } ?: layers.first()
+    val layerSettingsKey = if (selectedLayer.id == 1 && selectedLayer.type == "BARS") "BARS"
+        else "layer_${selectedLayer.id}_${selectedLayer.type}"
     val values by store.values.collectAsState()
-    val module = ModuleCatalog.modules.firstOrNull { it.id == selectedModuleId }
+    val module = ModuleCatalog.modules.firstOrNull { it.id == selectedLayer.type }
         ?: ModuleCatalog.modules.first()
+    LaunchedEffect(context) {
+        val restored = runCatching { restoreLayerRegistry(context) }.getOrDefault(emptyList())
+        if (restored.isNotEmpty()) {
+            layers = restored
+            selectedLayerId = restored.first().id
+            selectedModuleId = restored.first().type
+        }
+        layersLoaded = true
+    }
+    LaunchedEffect(layersLoaded, layers) {
+        if (layersLoaded) runCatching { persistLayerRegistry(context, layers) }
+    }
 
     var mediaController by remember { mutableStateOf<MediaController?>(null) }
     var selectedAudioUri by remember { mutableStateOf<Uri?>(null) }
@@ -272,7 +296,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
 
     val barsModule = ModuleCatalog.modules.first { it.id == "BARS" }
     fun barSetting(key: String, fallback: String): String =
-        values["BARS.$key"]
+        values["$layerSettingsKey.$key"] ?: values["BARS.$key"]
             ?: barsModule.groups.flatMap { it.settings }
                 .firstOrNull { it.key == key }?.defaultValue?.takeIf { it.isNotBlank() }
             ?: fallback
@@ -291,7 +315,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             }.coerceAtLeast(1),
             sensitivity = barSetting("maxHeightScale", "1").toFloatOrNull()
                 ?.coerceIn(0.1f, 4f) ?: 1f,
-            particlesEnabled = values["PARTICLES.visible"]?.toBoolean() ?: false
+            particlesEnabled = values["$layerSettingsKey.visible"]?.toBoolean() ?: values["PARTICLES.visible"]?.toBoolean() ?: false
         ).sanitized()
     }
     SideEffect { previewSurface?.updateSettings(liveSettings) }
@@ -415,16 +439,41 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     when (selectedTab) {
                         EditorTab.STUDIO -> StudioPropertiesPanel(
                             module = module,
+                            settingsKey = layerSettingsKey,
                             store = store,
-                            onReset = { store.reset(module.id, module.groups) },
+                            onReset = { store.reset(layerSettingsKey, module.groups) },
                             expandedGroup = expandedGroup,
                             onExpandedGroupChange = { expandedGroup = it }
                         )
-                        EditorTab.ELEMENTS -> ElementsPanel(
-                            selectedModuleId = selectedModuleId,
-                            onSelect = { id ->
-                                selectedModuleId = id
+                        EditorTab.ELEMENTS -> LayersPanel(
+                            layers = layers,
+                            selectedLayerId = selectedLayerId,
+                            onSelect = { layer ->
+                                selectedLayerId = layer.id
+                                selectedModuleId = layer.type
                                 selectedTab = EditorTab.STUDIO
+                            },
+                            onAdd = { type ->
+                                val spec = ModuleCatalog.modules.firstOrNull { it.id == type }
+                                if (spec != null) {
+                                    val nextId = (layers.maxOfOrNull { it.id } ?: 0) + 1
+                                    val sameTypeCount = layers.count { it.type == type } + 1
+                                    val newLayer = SavedLayerRecord(nextId, type, "${spec.title} $sameTypeCount")
+                                    layers = layers + newLayer
+                                    selectedLayerId = nextId
+                                    selectedModuleId = type
+                                    selectedTab = EditorTab.STUDIO
+                                }
+                            },
+                            onRemove = { layerId ->
+                                if (layers.size > 1) {
+                                    val updated = layers.filterNot { it.id == layerId }
+                                    layers = updated
+                                    if (selectedLayerId == layerId) {
+                                        selectedLayerId = updated.first().id
+                                        selectedModuleId = updated.first().type
+                                    }
+                                }
                             }
                         )
                         EditorTab.AUDIO -> AudioPanel(
@@ -782,6 +831,7 @@ private fun PlaybackStrip(
 @Composable
 private fun StudioPropertiesPanel(
     module: ModuleSpec,
+    settingsKey: String,
     store: ModuleSettingsStore,
     onReset: () -> Unit,
     expandedGroup: String?,
@@ -879,9 +929,9 @@ private fun StudioPropertiesPanel(
                                 group.settings.forEach { spec ->
                                     SettingControl(
                                         spec = spec,
-                                        value = store.value(module.id, spec),
+                                        value = store.value(settingsKey, spec),
                                         onValueChange = {
-                                            store.update(module.id, spec, it)
+                                            store.update(settingsKey, spec, it)
                                         }
                                     )
                                 }
