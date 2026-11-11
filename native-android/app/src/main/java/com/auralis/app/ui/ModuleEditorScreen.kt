@@ -378,11 +378,23 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         val measurePosition = MeasureWhat.fromLabel(raw("measurePos", "Nothing"))
         val measureScale = MeasureWhat.fromLabel(raw("measureScale", "Nothing"))
         val measureRotation = MeasureWhat.fromLabel(raw("measureRot", "Nothing"))
-        val mirrorMode = layers.firstOrNull { it.type == "MIRROREREFFECT" }?.let { effect ->
-            val effectKey = "layer_${effect.id}_${effect.type}"
-            val enabled = (values["$effectKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
-            if (enabled) values["$effectKey.mirrorMode"] ?: "Horizontal" else "None"
-        } ?: "None"
+        val mirrorEffect = layers.firstOrNull { it.type == "MIRROREREFFECT" }
+        val mirrorKey = mirrorEffect?.let { "layer_${it.id}_${it.type}" } ?: "MIRROREREFFECT"
+        val mirrorEnabled = mirrorEffect != null &&
+            ((values["$mirrorKey.visible"] ?: values["MIRROREREFFECT.visible"] ?: "true").toBooleanStrictOrNull() ?: true)
+        val configuredMirrorMode = if (mirrorEnabled) {
+            values["$mirrorKey.mirrorMode"] ?: values["MIRROREREFFECT.mirrorMode"] ?: "Horizontal"
+        } else "None"
+        val mirrorFlip = (values["$mirrorKey.flipMirror"] ?: values["MIRROREREFFECT.flipMirror"] ?: "false").toBooleanStrictOrNull() ?: false
+        val mirrorMode = if (mirrorFlip) when (configuredMirrorMode) {
+            "Horizontal" -> "Vertical"
+            "Vertical" -> "Horizontal"
+            else -> configuredMirrorMode
+        } else configuredMirrorMode
+        val mirrorOffset = (values["$mirrorKey.offset"] ?: values["MIRROREREFFECT.offset"] ?: "0").toFloatOrNull()?.coerceIn(-1f, 1f) ?: 0f
+        val mirrorColor = runCatching {
+            android.graphics.Color.parseColor(values["$mirrorKey.color"] ?: values["MIRROREREFFECT.color"] ?: "#FFFFFFFF").toLong() and 0xFFFFFFFFL
+        }.getOrDefault(0xFFFFFFFFL)
         val globalMirrorX = mirrorMode in listOf("Vertical", "Both", "Kaleidoscope")
         val globalMirrorY = mirrorMode in listOf("Horizontal", "Both", "Kaleidoscope")
         val rgbEffect = layers.firstOrNull { it.type == "RGBSPLITEFFECT" }
@@ -477,6 +489,9 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                     rotation = number("rotation", 0f),
                     mirror = flag("mirrorY") || globalMirrorY,
                     mirrorX = flag("mirrorX") || globalMirrorX,
+                    mirrorOffset = mirrorOffset,
+                    mirrorColor = mirrorColor,
+                    mirrorFlip = mirrorFlip,
                     positionMeasure = measurePosition,
                     scaleMeasure = measureScale,
                     rotationMeasure = measureRotation,
