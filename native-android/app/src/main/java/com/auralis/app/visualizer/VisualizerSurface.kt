@@ -25,11 +25,12 @@ class VisualizerSurface(context: Context) : GLSurfaceView(context) {
 
     fun submitSpectrum(values: FloatArray) = visualizerRenderer.submit(values)
     fun updateSettings(settings: VisualizerSettings) = visualizerRenderer.update(settings)
+    fun updateLayers(settings: List<VisualizerSettings>) = visualizerRenderer.updateLayers(settings)
 }
 
 private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     @Volatile private var spectrum = FloatArray(128)
-    @Volatile private var settings = VisualizerSettings()
+    @Volatile private var settings = listOf(VisualizerSettings())
     private var program = 0
     private var positionHandle = 0
     private var colorHandle = 0
@@ -51,7 +52,11 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     }
 
     fun update(value: VisualizerSettings) {
-        settings = value.sanitized()
+        settings = listOf(value.sanitized())
+    }
+
+    fun updateLayers(values: List<VisualizerSettings>) {
+        settings = values.map { it.sanitized() }.ifEmpty { listOf(VisualizerSettings(barsEnabled = false)) }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -99,14 +104,15 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         if (program == 0) return
-        val config = settings.sanitized()
+        val configs = settings
+        val beatConfig = configs.firstOrNull() ?: VisualizerSettings(barsEnabled = false)
         val data = spectrum
         val nowNanos = System.nanoTime()
         val elapsedSeconds = ((nowNanos - rendererStartNanos) / 1_000_000_000.0).toFloat()
         val bassBins = min(12, data.size)
         val bassEnergy = if (bassBins > 0) data.take(bassBins).average().toFloat() else 0f
         bassNoiseFloor = bassNoiseFloor * 0.985f + min(bassEnergy, bassNoiseFloor * 1.8f) * 0.015f
-        val beatThreshold = (0.12f - config.beatSensitivity * 0.075f).coerceIn(0.045f, 0.12f)
+        val beatThreshold = (0.12f - beatConfig.beatSensitivity * 0.075f).coerceIn(0.045f, 0.12f)
         val adaptiveFloor = max(beatThreshold, bassNoiseFloor * (2.0f - config.beatSensitivity * 0.65f))
         val onsetRatio = 1.48f - config.beatSensitivity * 0.40f
         if (bassEnergy > adaptiveFloor && bassEnergy > previousBassEnergy * onsetRatio && nowNanos - lastBeatNanos > 200_000_000L) {
@@ -116,6 +122,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             beatPulse *= 0.88f
         }
         previousBassEnergy = previousBassEnergy * 0.72f + bassEnergy * 0.28f
+        configs.forEach { config ->
         val positionSignal = measureSignal(config.positionMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val scaleSignal = measureSignal(config.scaleMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val rotationSignal = measureSignal(config.rotationMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
@@ -257,6 +264,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             points.position(2)
             GLES20.glVertexAttribPointer(colorHandle, 4, GLES20.GL_FLOAT, false, 24, points)
             GLES20.glDrawArrays(GLES20.GL_POINTS, 0, config.particleCount)
+        }
         }
         GLES20.glDisableVertexAttribArray(positionHandle)
         GLES20.glDisableVertexAttribArray(colorHandle)
