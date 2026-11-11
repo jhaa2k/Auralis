@@ -787,6 +787,67 @@ private fun PreviewPane(
 }
 
 @Composable
+private fun TextLayerOverlay(layer: SavedLayerRecord, values: Map<String, String>, trackName: String) {
+    val key = if (layer.id == 1 && layer.type == "BARS") "BARS" else "layer_${layer.id}_${layer.type}"
+    fun value(name: String, fallback: String) = values["$key.$name"] ?: values["TEXT.$name"] ?: fallback
+    if (value("visible", "true").toBooleanStrictOrNull() == false) return
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val x = value("positionX", "0.5").toFloatOrNull() ?: 0.5f
+        val y = value("positionY", "0.5").toFloatOrNull() ?: 0.5f
+        val sx = value("scaleX", "1").toFloatOrNull() ?: 1f
+        val sy = value("scaleY", "1").toFloatOrNull() ?: 1f
+        val rotation = value("rotation", "0").toFloatOrNull() ?: 0f
+        val size = value("fontSize", "30").toFloatOrNull()?.coerceIn(6f, 300f) ?: 30f
+        val color = runCatching { Color(android.graphics.Color.parseColor(value("textColor", "#FFFFFFFF"))) }.getOrDefault(Color.White)
+        val text = value("textInput", "{ArtistOrTitle}").replace("{ArtistOrTitle}", trackName.substringBeforeLast('.', trackName)).replace("%title%", trackName)
+        Box(
+            modifier = Modifier.align(Alignment.Center).offset {
+                IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight).toInt())
+            }.graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f), scaleY = sy.coerceIn(0.05f, 8f), rotationZ = rotation),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = text, color = color, fontSize = size.sp, fontWeight = if (value("fontWeight", "400").toIntOrNull()?.let { it >= 700 } == true) FontWeight.Bold else FontWeight.Normal)
+        }
+    }
+}
+
+@Composable
+private fun ImageLayerOverlay(layer: SavedLayerRecord, values: Map<String, String>) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val key = "layer_${layer.id}_${layer.type}"
+    val uriString = values["$key.pickImage"] ?: values["IMAGE.pickImage"] ?: values["$key.fallbackImage"]
+    val visible = (values["$key.visible"] ?: values["IMAGE.visible"] ?: "true").toBooleanStrictOrNull() ?: true
+    if (!visible || uriString.isNullOrBlank()) return
+    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, uriString) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { context.contentResolver.openInputStream(Uri.parse(uriString))?.use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull()
+        }
+    }
+    if (bitmap == null) return
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val x = (values["$key.positionX"] ?: values["IMAGE.positionX"])?.toFloatOrNull() ?: 0.5f
+        val y = (values["$key.positionY"] ?: values["IMAGE.positionY"])?.toFloatOrNull() ?: 0.5f
+        val sx = (values["$key.scaleX"] ?: values["IMAGE.scaleX"])?.toFloatOrNull() ?: 1f
+        val sy = (values["$key.scaleY"] ?: values["IMAGE.scaleY"])?.toFloatOrNull() ?: 1f
+        val rotation = (values["$key.rotation"] ?: values["IMAGE.rotation"])?.toFloatOrNull() ?: 0f
+        val opacity = (values["$key.opacityStrength"] ?: values["IMAGE.opacityStrength"])?.toFloatOrNull() ?: 1f
+        Box(
+            modifier = Modifier.align(Alignment.Center).offset {
+                IntOffset(((x - 0.5f) * constraints.maxWidth).toInt(), ((y - 0.5f) * constraints.maxHeight).toInt())
+            }.size(width = maxWidth * 0.42f, height = maxHeight * 0.42f)
+                .graphicsLayer(scaleX = sx.coerceIn(0.05f, 8f), scaleY = sy.coerceIn(0.05f, 8f), rotationZ = rotation, alpha = opacity.coerceIn(0f, 1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = layer.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = if ((values["$key.keepAspect"] ?: "true").toBooleanStrictOrNull() != false) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop
+            )
+        }
+    }
+}
+@Composable
 private fun AspectRatioMenu(
     selected: String,
     onSelect: (String) -> Unit
