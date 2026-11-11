@@ -187,10 +187,11 @@ object VisualizerVideoExporter {
             GLES20.glViewport(0,0,w,h);GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
         fun draw(bands: FloatArray, layers: List<VisualizerSettings>) {
-            GLES20.glClearColor(.018f,.02f,.028f,1f)
-            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             buf.clear()
             val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
+            val background = configs.firstOrNull()?.backgroundColor ?: 0xFF101116L
+            GLES20.glClearColor(((background shr 16) and 255).toFloat()/255f, ((background shr 8) and 255).toFloat()/255f, (background and 255).toFloat()/255f, ((background shr 24) and 255).toFloat()/255f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val time = System.nanoTime() / 1_000_000_000.0
             fun quad(left: Float, bottom: Float, right: Float, top: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings) {
                 val angle = Math.toRadians(config.rotation.toDouble())
