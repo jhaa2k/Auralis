@@ -7,6 +7,7 @@ data class VisualizerSettings(
     val glow: Float = 0.25f,
     val opacity: Float = 1f,
     val mirror: Boolean = false,
+    val mirrorX: Boolean = false,
     val positionX: Float = 0.5f,
     val positionY: Float = 0.5f,
     val scale: Float = 1f,
