@@ -112,6 +112,10 @@ fun AuralisApp() {
     var isPlaying by remember { mutableStateOf(false) }
     var playbackPosition by remember { mutableLongStateOf(0L) }
     var playbackDuration by remember { mutableLongStateOf(0L) }
+    var playbackSpeed by remember { mutableFloatStateOf(1f) }
+    var isLooping by remember { mutableStateOf(false) }
+    var volumeLevel by remember { mutableFloatStateOf(1f) }
+    var speedMenuExpanded by remember { mutableStateOf(false) }
     var playerMessage by remember { mutableStateOf("CONNECTING TO AUDIO ENGINE") }
     var selectedTab by remember { mutableIntStateOf(0) }
     val exportScope = rememberCoroutineScope()
@@ -463,13 +467,25 @@ fun AuralisApp() {
                             }
                             Text("${formatTime(playbackPosition)} / ${formatTime(playbackDuration)}", color = StudioMuted, fontSize = 9.sp)
                         }
-                        Slider(
-                            value = if (playbackDuration > 0L) playbackPosition.toFloat().coerceIn(0f, playbackDuration.toFloat()) else 0f,
-                            onValueChange = { playbackPosition = it.toLong() },
-                            onValueChangeFinished = { if (playbackDuration > 0L) mediaController?.seekTo(playbackPosition) },
-                            valueRange = 0f..playbackDuration.coerceAtLeast(1L).toFloat(),
-                            enabled = mediaController != null && playbackDuration > 0L
+                        TimelineSeekBar(
+                            positionMs = playbackPosition,
+                            durationMs = playbackDuration,
+                            enabled = mediaController != null && playbackDuration > 0L,
+                            onSeek = { target -> playbackPosition = target; mediaController?.seekTo(target) }
                         )
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Button(onClick = { mediaController?.let { it.seekTo((it.currentPosition - 10_000L).coerceAtLeast(0L)) } }, enabled = selectedTrackUri != null, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("-10", fontSize = 8.sp) }
+                            Button(onClick = { isLooping = !isLooping; mediaController?.repeatMode = if (isLooping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = if (isLooping) StudioAccent else StudioRaised, contentColor = if (isLooping) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text(if (isLooping) "LOOP ON" else "LOOP OFF", fontSize = 8.sp) }
+                            Button(onClick = { mediaController?.let { it.seekTo((it.currentPosition + 10_000L).coerceAtMost(it.duration.coerceAtLeast(0L))) } }, enabled = selectedTrackUri != null, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("+10", fontSize = 8.sp) }
+                            Box {
+                                Button(onClick = { speedMenuExpanded = true }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioRaised, contentColor = StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("${playbackSpeed}×", fontSize = 8.sp) }
+                                DropdownMenu(expanded = speedMenuExpanded, onDismissRequest = { speedMenuExpanded = false }) {
+                                    listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f).forEach { speed ->
+                                        DropdownMenuItem(text = { Text("${speed}×") }, onClick = { playbackSpeed = speed; mediaController?.setPlaybackSpeed(speed); speedMenuExpanded = false })
+                                    }
+                                }
+                            }
+                        }
                         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Button(
                                 onClick = { audioPicker.launch(arrayOf("audio/*")) },
@@ -669,6 +685,7 @@ fun AuralisApp() {
                         }
                         2 -> {
                             PropertySlider("Input gain", audioGain, { audioGain = it }, "QUIET", "LOUD", "${(audioGain * 100).toInt()}%", resetValue = 0.70f)
+                            PropertySlider("Playback volume", volumeLevel, { volumeLevel = it; mediaController?.volume = it }, "MUTE", "100%", "${(volumeLevel * 100).toInt()}%", resetValue = 1f)
                             PropertySlider("Spectrum lower range", fftLower, { fftLower = it.coerceAtMost(fftUpper - 0.05f) }, "LOW", "MID", "${(20 + fftLower * 180).toInt()} Hz", resetValue = 0.02f)
                             PropertySlider("Spectrum upper range", fftUpper, { fftUpper = it.coerceAtLeast(fftLower + 0.05f) }, "MID", "HIGH", "${(200 + fftUpper * 17800).toInt()} Hz", resetValue = 0.92f)
                             PropertySlider("Beat sensitivity", beatSensitivity, { beatSensitivity = it }, "LESS", "MORE", "${(beatSensitivity * 100).toInt()}%", resetValue = 0.55f)
@@ -819,6 +836,44 @@ private fun MeasureDropdown(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TimelineSeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    enabled: Boolean,
+    onSeek: (Long) -> Unit
+) {
+    var dragFraction by remember { mutableFloatStateOf(-1f) }
+    val fraction = if (dragFraction >= 0f) dragFraction else if (durationMs > 0L) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Canvas(
+            modifier = Modifier.fillMaxWidth().height(22.dp)
+                .pointerInput(durationMs, enabled) {
+                    if (enabled && durationMs > 0L) detectTapGestures { point ->
+                        onSeek((point.x / size.width).coerceIn(0f, 1f).times(durationMs).toLong())
+                    }
+                }
+                .pointerInput(durationMs, enabled) {
+                    if (enabled && durationMs > 0L) detectDragGestures(
+                        onDragStart = { point -> dragFraction = (point.x / size.width).coerceIn(0f, 1f) },
+                        onDrag = { change, _ -> change.consume(); dragFraction = (change.position.x / size.width).coerceIn(0f, 1f) },
+                        onDragEnd = { if (dragFraction >= 0f) onSeek((dragFraction * durationMs).toLong()); dragFraction = -1f },
+                        onDragCancel = { dragFraction = -1f }
+                    )
+                }
+        ) {
+            val cy = size.height / 2f
+            val inset = 6.dp.toPx()
+            val end = size.width - inset
+            val x = inset + (end - inset) * fraction
+            drawLine(StudioLine, Offset(inset, cy), Offset(end, cy), strokeWidth = 3.dp.toPx())
+            drawLine(if (enabled) StudioAccent else StudioMuted, Offset(inset, cy), Offset(x, cy), strokeWidth = 3.dp.toPx())
+            drawCircle(StudioBlack, 6.dp.toPx(), Offset(x, cy))
+            drawCircle(if (enabled) StudioAccent else StudioMuted, 5.dp.toPx(), Offset(x, cy), style = Stroke(width = 1.8.dp.toPx()))
         }
     }
 }
