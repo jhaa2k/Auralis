@@ -301,8 +301,17 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         } else {
             val key = "layer_${provider.id}_${provider.type}"
             fun read(name: String, fallback: Float) = (values["$key.$name"] ?: values["AUDIOPROVIDER.$name"])?.toFloatOrNull() ?: fallback
-            val lowHz = read("lowerHz", 20f).coerceIn(20f, 19000f)
-            val highHz = read("higherHz", 18000f).coerceIn(lowHz + 1f, 20000f)
+            val sourceMode = values["$key.measureSource"] ?: values["AUDIOPROVIDER.measureSource"] ?: "Bass"
+            val manualLow = read("lowerHz", 20f).coerceIn(20f, 19000f)
+            val manualHigh = read("higherHz", 18000f).coerceIn(manualLow + 1f, 20000f)
+            val range = when (sourceMode) {
+                "Bass" -> 20f to 250f
+                "Mid" -> 250f to 4000f
+                "Treble" -> 4000f to 18000f
+                else -> manualLow to manualHigh
+            }
+            val lowHz = range.first.coerceIn(20f, 19000f)
+            val highHz = range.second.coerceIn(lowHz + 1f, 20000f)
             val frequencyRange = kotlin.math.ln(1000f)
             val lowFraction = (kotlin.math.ln(lowHz / 20f) / frequencyRange).coerceIn(0f, 0.95f)
             val highFraction = (kotlin.math.ln(highHz / 20f) / frequencyRange).coerceIn(lowFraction + 0.05f, 1f)
