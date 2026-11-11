@@ -172,7 +172,7 @@ object VisualizerVideoExporter {
 
     private class GlSurface(input:android.view.Surface,w:Int,h:Int) {
         val display=EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);private val context:android.opengl.EGLContext;val surface:android.opengl.EGLSurface
-        private val program:Int;private val p:Int;private val col:Int;private var buf:FloatBuffer
+        private val program:Int;private val p:Int;private val col:Int;private val offsetHandle:Int;private val tintHandle:Int;private var buf:FloatBuffer
         init {
             val v=IntArray(2);check(EGL14.eglInitialize(display,v,0,v,1))
             val attrs=intArrayOf(EGL14.EGL_RED_SIZE,8,EGL14.EGL_GREEN_SIZE,8,EGL14.EGL_BLUE_SIZE,8,EGL14.EGL_ALPHA_SIZE,8,EGL14.EGL_RENDERABLE_TYPE,EGL14.EGL_OPENGL_ES2_BIT,0x3142,1,EGL14.EGL_NONE)
@@ -180,9 +180,9 @@ object VisualizerVideoExporter {
             context=EGL14.eglCreateContext(display,cs[0],EGL14.EGL_NO_CONTEXT,intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION,2,EGL14.EGL_NONE),0)
             surface=EGL14.eglCreateWindowSurface(display,cs[0],input,intArrayOf(EGL14.EGL_NONE),0)
             check(EGL14.eglMakeCurrent(display,surface,surface,context))
-            val vs="attribute vec2 p;attribute vec4 c;varying vec4 v;void main(){gl_Position=vec4(p,0.,1.);v=c;}"
-            val fs="precision mediump float;varying vec4 v;void main(){gl_FragColor=v;}"
-            program=link(shader(GLES20.GL_VERTEX_SHADER,vs),shader(GLES20.GL_FRAGMENT_SHADER,fs));p=GLES20.glGetAttribLocation(program,"p");col=GLES20.glGetAttribLocation(program,"c")
+            val vs="attribute vec2 p;attribute vec4 c;varying vec4 v;uniform vec2 uOffset;void main(){gl_Position=vec4(p+uOffset,0.,1.);v=c;}"
+            val fs="precision mediump float;varying vec4 v;uniform vec4 uTint;void main(){gl_FragColor=v*uTint;}"
+            program=link(shader(GLES20.GL_VERTEX_SHADER,vs),shader(GLES20.GL_FRAGMENT_SHADER,fs));p=GLES20.glGetAttribLocation(program,"p");col=GLES20.glGetAttribLocation(program,"c");offsetHandle=GLES20.glGetUniformLocation(program,"uOffset");tintHandle=GLES20.glGetUniformLocation(program,"uTint")
             buf=ByteBuffer.allocateDirect(64*36*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             GLES20.glViewport(0,0,w,h);GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
@@ -353,6 +353,27 @@ object VisualizerVideoExporter {
             GLES20.glVertexAttribPointer(p,2,GLES20.GL_FLOAT,false,24,buf)
             buf.position(2)
             GLES20.glVertexAttribPointer(col,4,GLES20.GL_FLOAT,false,24,buf)
+            val rgb = configs.firstOrNull { it.rgbSplitAmount > 0f }
+            val rgbActive = rgb != null && (!rgb.rgbSplitOnBeat || bands.average() > 0.15f)
+            if (rgbActive && rgb != null) {
+                val shift = 0.002f + rgb.rgbSplitAmount * 0.028f
+                val angle = Math.toRadians(rgb.rgbSplitAngle.toDouble())
+                val dx = cos(angle).toFloat(); val dy = sin(angle).toFloat()
+                val redShift = shift * (1f + rgb.rgbRedOffset / 100f)
+                val greenShift = shift * (rgb.rgbGreenOffset / 100f)
+                val blueShift = shift * (1f + rgb.rgbBlueOffset / 100f)
+                GLES20.glUniform2f(offsetHandle,-dx*redShift,-dy*redShift)
+                GLES20.glUniform4f(tintHandle,1f,0f,0f,.72f)
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices)
+                GLES20.glUniform2f(offsetHandle,dx*greenShift,dy*greenShift)
+                GLES20.glUniform4f(tintHandle,0f,1f,0f,.72f)
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices)
+                GLES20.glUniform2f(offsetHandle,dx*blueShift,dy*blueShift)
+                GLES20.glUniform4f(tintHandle,0f,0f,1f,.72f)
+                GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices)
+            }
+            GLES20.glUniform2f(offsetHandle,0f,0f)
+            GLES20.glUniform4f(tintHandle,1f,1f,1f,1f)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,vertices)
             GLES20.glDisableVertexAttribArray(p); GLES20.glDisableVertexAttribArray(col)
         }
