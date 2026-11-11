@@ -183,14 +183,14 @@ object VisualizerVideoExporter {
             val vs="attribute vec2 p;attribute vec4 c;varying vec4 v;void main(){gl_Position=vec4(p,0.,1.);v=c;}"
             val fs="precision mediump float;varying vec4 v;void main(){gl_FragColor=v;}"
             program=link(shader(GLES20.GL_VERTEX_SHADER,vs),shader(GLES20.GL_FRAGMENT_SHADER,fs));p=GLES20.glGetAttribLocation(program,"p");col=GLES20.glGetAttribLocation(program,"c")
-            buf=ByteBuffer.allocateDirect((128*32*36*8 + 400*36*8)*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+            buf=ByteBuffer.allocateDirect((128*32*36*16 + 400*36*16)*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
             GLES20.glViewport(0,0,w,h);GLES20.glEnable(GLES20.GL_BLEND);GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA,GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
         fun draw(bands: FloatArray, layers: List<VisualizerSettings>) {
             GLES20.glClearColor(.018f,.02f,.028f,1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             buf.clear()
-            val configs = layers.ifEmpty { listOf(VisualizerSettings()) }
+            val configs = (layers.ifEmpty { listOf(VisualizerSettings()) }).take(16)
             val time = System.nanoTime() / 1_000_000_000.0
             fun quad(left: Float, bottom: Float, right: Float, top: Float, red: Float, green: Float, blue: Float, alpha: Float, config: VisualizerSettings) {
                 val angle = Math.toRadians(config.rotation.toDouble())
@@ -229,12 +229,12 @@ object VisualizerVideoExporter {
                     for(i in 0 until count) {
                         val seed=i.toFloat(); val phase=((time*config.particleSpeed*.12+seed*.6180339)%1.0).toFloat()
                         val angle=seed*2.3999632f; val radius=(.12f+(seed*.7548776f%1f)*config.particleSpread)*(.65f+bands.average().toFloat()*.75f)
-                        val x=cos((angle+time.toFloat()*.1*config.particleSpeed)).toFloat()*radius
-                        val y=phase*2f-1f+sin((angle*1.7f+time.toFloat()*.4)).toFloat()*.08f
+                        val x=cos((angle+time.toFloat()*.1f*config.particleSpeed)).toFloat()*radius
+                        val y=phase*2f-1f+sin((angle*1.7f+time.toFloat()*.4f)).toFloat()*.08f
                         val half=(config.particleSize.coerceIn(1f,12f)/160f)*config.particleScale
                         val color=config.particleColor
                         val alpha=config.particleOpacity*(((color shr 24) and 255).toFloat()/255f)
-                        quad(x-half,y-half,x+half,y+half,((color shr 16) and 255)/255f,((color shr 8) and 255)/255f,(color and 255)/255f,alpha,config)
+                        quad(x-half,y-half,x+half,y+half,(((color shr 16) and 255).toFloat()/255f),(((color shr 8) and 255).toFloat()/255f),((color and 255).toFloat()/255f),alpha,config)
                     }
                 }
             }
