@@ -891,7 +891,38 @@ fun AuralisApp() {
                 values = modulePropertyValues,
                 onBack = { detailsModule = null },
                 onReset = { modulePropertyValues.keys.filter { it.startsWith("$detailsLayerId/") }.forEach { modulePropertyValues.remove(it) } },
-                onPickImage = { field -> pendingImageField = field; imagePicker.launch(arrayOf("image/*")) }
+                onPickImage = { field -> pendingImageField = field; imagePicker.launch(arrayOf("image/*")) },
+                onPropertyChange = { group, field, value ->
+                    val index = editorLayers.indexOfFirst { it.id == detailsLayerId }
+                    if (index >= 0) {
+                        val layer = editorLayers[index]
+                        val number = value.toFloatOrNull()
+                        val color = runCatching { android.graphics.Color.parseColor(value).toLong() }.getOrNull()
+                        val updated = when {
+                            group == "General" && field == "Visible" -> layer.copy(visible = value.toBoolean())
+                            group == "General" && field == "Position X" -> layer.copy(x = (number ?: layer.x).coerceIn(0f, 1f))
+                            group == "General" && field == "Position Y" -> layer.copy(y = (number ?: layer.y).coerceIn(0f, 1f))
+                            group == "General" && field == "Scale X" -> layer.copy(scale = (number ?: layer.scale).coerceIn(0.1f, 3f))
+                            group == "General" && field == "Scale Y" -> layer.copy(scale = (number ?: layer.scale).coerceIn(0.1f, 3f))
+                            group == "General" && field == "Rotation" -> layer.copy(rotation = (number ?: layer.rotation).coerceIn(-360f, 360f))
+                            group == "Appearance" && activeModule == "TEXT" && field == "Text" -> layer.copy(textContent = value)
+                            group == "Appearance" && activeModule == "TEXT" && field == "Font Size" -> layer.copy(fontSize = (number ?: layer.fontSize).coerceIn(8f, 96f))
+                            group == "Appearance" && activeModule == "TEXT" && field == "Color" && color != null -> layer.copy(textColor = color)
+                            group == "Overall" && activeModule == "PARTICLES" && field == "Vector Angle" -> layer.copy(particleVectorAngle = number ?: layer.particleVectorAngle)
+                            group == "Overall" && activeModule == "PARTICLES" && field == "Color" && color != null -> layer.copy(particleColor = color)
+                            group == "Appearance" && activeModule == "PARTICLES" && field == "Color From" && color != null -> layer.copy(particleColor = color)
+                            group == "Appearance" && activeModule == "PARTICLES" && field == "Fade In And Out Time" -> layer.copy(particleTransparency = (1f - (number ?: 0f)).coerceIn(0f, 1f))
+                            group == "Appearance" && activeModule == "RGBSPLITEFFECT" && field == "Split Multiplier" -> layer.copy(rgbSplitAmount = (number ?: 0f).coerceIn(0f, 1f))
+                            group == "Motion Blur" && field == "Blur Amount Multiplier" -> layer.copy(motionBlurTrailing = (number ?: 0f).coerceIn(0f, 0.65f))
+                            group == "Blur" && field == "Blur Radius" -> layer.copy(blurIntensity = (number ?: 0f).coerceIn(0f, 0.65f))
+                            else -> layer
+                        }
+                        editorLayers[index] = updated
+                        if (activeModule == "BARS" && group == "Bars" && field == "Bars Count") {
+                            barCount = (((number ?: 64f) - 12f) / 116f).coerceIn(0f, 1f)
+                        }
+                    }
+                }
             )
         }
     }
