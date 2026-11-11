@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
@@ -696,7 +698,8 @@ private fun PropertySlider(
     onValueChange: (Float) -> Unit,
     startLabel: String,
     endLabel: String,
-    valueLabel: String
+    valueLabel: String,
+    resetValue: Float = 0.5f
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -704,9 +707,21 @@ private fun PropertySlider(
             Spacer(Modifier.weight(1f))
             Text(valueLabel, color = StudioAccent, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
-        Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f)
-        Row {
+        Slider(
+            value = value.coerceIn(0f, 1f),
+            onValueChange = onValueChange,
+            valueRange = 0f..1f,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(26.dp)
+                .pointerInput(resetValue) {
+                    detectTapGestures(onDoubleTap = { onValueChange(resetValue.coerceIn(0f, 1f)) })
+                }
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(startLabel, color = StudioMuted, fontSize = 7.sp)
+            Spacer(Modifier.weight(1f))
+            Text("DOUBLE-TAP TO RESET", color = StudioMuted.copy(alpha = 0.65f), fontSize = 6.sp)
             Spacer(Modifier.weight(1f))
             Text(endLabel, color = StudioMuted, fontSize = 7.sp)
         }
