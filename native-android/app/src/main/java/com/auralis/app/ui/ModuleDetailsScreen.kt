@@ -211,8 +211,19 @@ internal fun ModuleDetailsScreen(
                                             }
                                             SettingKind.SLIDER -> {
                                                 val numeric=value.toFloatOrNull() ?: 0f
+                                                val maxValue = when(field.name) {
+                                                    "Rotation", "Vector Angle", "Vector Angle Z" -> 360f
+                                                    "Count Limit" -> 5000f
+                                                    "Perspective Depth" -> 2000f
+                                                    "Perspective Fov" -> 180f
+                                                    "Bars Count" -> 128f
+                                                    "Segments Count" -> 32f
+                                                    "Higher Hz", "Lower Hz" -> 20000f
+                                                    "Speed" -> 200f
+                                                    else -> maxOf(1f, (field.defaultValue.toFloatOrNull() ?: 1f) * 2f)
+                                                }
                                                 Row(verticalAlignment=Alignment.CenterVertically) {
-                                                    Slider(value=numeric.coerceIn(0f,1000f),onValueChange={write(field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..1000f,modifier=Modifier.weight(1f),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
+                                                    Slider(value=numeric.coerceIn(0f,maxValue),onValueChange={write(field,String.format(Locale.US,"%.3f",it))}, valueRange=0f..maxValue,modifier=Modifier.weight(1f),colors=SliderDefaults.colors(thumbColor=StudioAccent,activeTrackColor=StudioAccent,inactiveTrackColor=StudioLine))
                                                     Text(value,color=StudioWhite,fontSize=8.sp,modifier=Modifier.width(54.dp))
                                                 }
                                             }
