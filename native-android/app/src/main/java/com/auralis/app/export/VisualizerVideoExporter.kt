@@ -453,10 +453,26 @@ object VisualizerVideoExporter {
                         val wave = sin(phase * waveFrequency * 6.2831853f + seedAngle) * waveMagnitude * .025f
                         baseX += -directionY * wave
                         baseY += directionX * wave
-                        val measureOffsetX = (config.particlePositionX - .5f) * 2f
-                        val measureOffsetY = (.5f - config.particlePositionY) * 2f
-                        val x = (baseX * config.particleScale + measureOffsetX).coerceIn(-1.4f, 1.4f)
-                        val y = (baseY * config.particleScale + measureOffsetY).coerceIn(-1.4f, 1.4f)
+                        val particlePositionSignal = measureValue(
+                            config.particlePositionMeasure.label, time.toFloat(), energy, beatPulse, config.trackPositionFraction
+                        )
+                        val particleScaleSignal = measureValue(
+                            config.particleScaleMeasure.label, time.toFloat(), energy, beatPulse, config.trackPositionFraction
+                        )
+                        val particleRotationSignal = measureValue(
+                            config.particleRotationMeasure.label, time.toFloat(), energy, beatPulse, config.trackPositionFraction
+                        )
+                        val particleAmount = config.particleMeasureAmount
+                        val measureOffsetX = (config.particlePositionX - .5f) * 2f +
+                            (particlePositionSignal - .5f) * particleAmount * .6f
+                        val measureOffsetY = (.5f - config.particlePositionY) * 2f -
+                            (particlePositionSignal - .5f) * particleAmount * .6f
+                        val particleScale = (config.particleScale *
+                            (1f + (particleScaleSignal - .5f) * particleAmount)).coerceIn(.1f, 4f)
+                        val particleRotation = config.particleRotation +
+                            (particleRotationSignal - .5f) * particleAmount * 90f
+                        val x = (baseX * particleScale + measureOffsetX).coerceIn(-1.4f, 1.4f)
+                        val y = (baseY * particleScale + measureOffsetY).coerceIn(-1.4f, 1.4f)
                         val fadeWindow = (config.particleFadeInOutTime / life).coerceIn(0f, .5f)
                         val fadeIn = if (fadeWindow <= 0f) 1f else (phase / fadeWindow).coerceIn(0f, 1f)
                         val fadeOut = if (fadeWindow <= 0f) 1f else ((1f - phase) / fadeWindow).coerceIn(0f, 1f)
@@ -468,10 +484,10 @@ object VisualizerVideoExporter {
                         val startSize = if (config.particleFadeInSize > 0f) config.particleFadeInSize else config.particleSize
                         val endSize = (config.particleEndSize + (randomB * 2f - 1f) * config.particleEndSizeRandom).coerceIn(0f, 64f)
                         val zSizeFactor = 1f + config.particleEndSizeZFactor * (1f - perspectiveFactor) * .05f
-                        val size = (startSize + (endSize - startSize) * phase) * config.particleScale * perspectiveFactor * zSizeFactor / 160f
+                        val size = (startSize + (endSize - startSize) * phase) * particleScale * perspectiveFactor * zSizeFactor / 160f
                         val halfX = size * config.particleSizeAspectRatio
                         val halfY = size
-                        val drawAngle = if (config.particleVelocityAngle) Math.toDegrees(direction).toFloat() else config.particleRotation
+                        val drawAngle = if (config.particleVelocityAngle) Math.toDegrees(direction).toFloat() else particleRotation
                         fun drawParticle(
                             px: Float, py: Float, alphaMul: Float = 1f, sizeMul: Float = 1f,
                             mirrorCopy: Boolean = false, offsetX: Float = 0f, offsetY: Float = 0f
