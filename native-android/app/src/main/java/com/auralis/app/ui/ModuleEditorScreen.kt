@@ -338,7 +338,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             val highFraction = (kotlin.math.ln(highHz / 20f) / frequencyRange).coerceIn(lowFraction + 0.05f, 1f)
             capture.configure(
                 smoothing = read("smooth", 0.35f).coerceIn(0f, 0.95f),
-                gain = (read("volume", 1f) * read("preamp", 1f)).coerceIn(0.1f, 4f),
+                gain = (read("volume", 1f) * read("preamp", 1f)).coerceIn(0f, 4f),
                 lowFrequencyFraction = lowFraction,
                 highFrequencyFraction = highFraction,
                 measureSource = sourceMode
