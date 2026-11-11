@@ -728,9 +728,17 @@ fun AuralisApp() {
                                             Text("GLSL ES 2.0 SOURCE", color = StudioMuted, fontSize = 8.sp)
                                             BasicTextField(value = selected.shaderSource, onValueChange = { editorLayers[selectedIndex] = selected.copy(shaderSource = it) }, textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 9.sp), modifier = Modifier.fillMaxWidth().height(120.dp).background(StudioBlack).padding(7.dp))
                                             PropertyInfoRow("Shader compiler", "Not connected yet")
+                                        } else if (selected.type == "Bars") {
+                                            PropertySlider("Speed", selected.barsSpeed / 4f, { editorLayers[selectedIndex] = selected.copy(barsSpeed = 0.1f + it * 3.9f) }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", selected.barsSpeed), resetValue = 0.23f)
+                                            PropertySlider("Beat amount", selected.beatAmount, { editorLayers[selectedIndex] = selected.copy(beatAmount = it) }, "SUBTLE", "STRONG", "${(selected.beatAmount * 100).toInt()}%", resetValue = 0.5f)
+                                            if ((12 + barCount * 116).toInt() > 96 || (1 + (segmentCountValue * 31f).toInt()) > 24) Text("WARNING: High bars/segments count may reduce frame rate.", color = StudioAccent, fontSize = 8.sp)
                                         } else if (selected.type == "RGB Split") {
                                             PropertySlider("Channel separation", selected.rgbSplitAmount, { editorLayers[selectedIndex] = selected.copy(rgbSplitAmount = it) }, "0 PX", "MAX", "${(selected.rgbSplitAmount * 100).toInt()}%", resetValue = 0f)
-                                            PropertyInfoRow("Effect scope", "Spectrum geometry only")
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Checkbox(checked = selected.rgbBeatTrigger, onCheckedChange = { editorLayers[selectedIndex] = selected.copy(rgbBeatTrigger = it) })
+                                                Text("Trigger on heavy beats", color = StudioWhite, fontSize = 8.sp)
+                                            }
+                                            PropertyInfoRow("Effect scope", "Spectrum geometry only; full-frame pending")
                                         } else {
                                             PropertyInfoRow("Adjustment controls", "No type-specific adjustments available")
                                         }
@@ -742,6 +750,14 @@ fun AuralisApp() {
                                         }
                                         PropertyInfoRow("Layer behaviour", "Visibility and transform are active")
                                         if (selected.type == "Particles") PropertyInfoRow("Motion", "Procedural movement / live FFT energy")
+                                        if (selected.type == "Mirror Effect") {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Checkbox(checked = mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
+                                                Text("Enable symmetry", color = StudioWhite, fontSize = 8.sp)
+                                            }
+                                            PropertyInfoRow("Target layer", "Selected layer: ${selected.name}")
+                                            PropertyInfoRow("Mirror mode", "Horizontal / vertical architecture")
+                                        }
                                         if (selected.type == "Image") PropertyInfoRow("Aspect ratio", "Fit without stretching")
                                     }
                                     "AUDIO / MEASURE" -> {
