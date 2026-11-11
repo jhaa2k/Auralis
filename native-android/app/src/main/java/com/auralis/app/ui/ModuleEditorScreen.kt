@@ -720,9 +720,9 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             title = { Text(module.title) },
             text = {
                 Text(
-                    "This inspector exposes the module's full settings catalog. " +
-                        "Settings are saved locally. Only controls connected to the active OpenGL renderer " +
-                        "affect the live canvas; advanced effect controls remain stored until their renderer is integrated."
+                    "THIS INSPECTOR EXPOSES THE MODULE'S FULL SETTINGS CATALOG. " +
+                        "SETTINGS ARE SAVED LOCALLY. ONLY CONTROLS CONNECTED TO THE ACTIVE OPENGL RENDERER " +
+                        "AFFECT THE LIVE CANVAS; ADVANCED EFFECT CONTROLS REMAIN STORED UNTIL THEIR RENDERER IS INTEGRATED."
                 )
             },
             confirmButton = {
@@ -895,7 +895,7 @@ private fun PreviewPane(
                             letterSpacing = 0.8.sp
                         )
                         Text(
-                            "Import a track to activate audio reaction",
+                            "IMPORT A TRACK TO ACTIVATE AUDIO REACTION",
                             color = EditorMuted,
                             fontSize = 8.sp
                         )
@@ -1178,7 +1178,7 @@ private fun StudioPropertiesPanel(
                     letterSpacing = 0.9.sp
                 )
                 Text(
-                    module.title,
+                    module.title.uppercase(),
                     color = EditorText,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
@@ -1220,7 +1220,7 @@ private fun StudioPropertiesPanel(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    group.title,
+                                    group.title.uppercase(),
                                     color = EditorText,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold
@@ -1841,7 +1841,7 @@ private fun SettingControl(
             }
 
             SettingKind.IMAGE_PICKER -> {
-                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                Text(spec.label.uppercase(), color = EditorText, fontSize = 10.sp)
                 OutlinedButton(
                     onClick = { imagePicker.launch(arrayOf("image/*")) },
                     modifier = Modifier.fillMaxWidth().height(37.dp),
@@ -1855,7 +1855,7 @@ private fun SettingControl(
             }
 
             SettingKind.FONT_PICKER -> {
-                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                Text(spec.label.uppercase(), color = EditorText, fontSize = 10.sp)
                 OutlinedButton(
                     onClick = { fontPicker.launch(arrayOf("font/*", "application/octet-stream")) },
                     modifier = Modifier.fillMaxWidth().height(37.dp),
@@ -1869,7 +1869,7 @@ private fun SettingControl(
             }
 
             SettingKind.CODE, SettingKind.TEXT -> {
-                Text(spec.label, color = EditorText, fontSize = 10.sp)
+                Text(spec.label.uppercase(), color = EditorText, fontSize = 10.sp)
                 OutlinedTextField(
                     value = value,
                     onValueChange = onValueChange,
@@ -1999,7 +1999,7 @@ private fun queryAudioName(context: android.content.Context, uri: Uri): String {
         } else {
             null
         }
-    } ?: "Selected audio"
+    } ?: "SELECTED AUDIO"
 }
 
 private fun String.toAspectRatio(): Float = when (this) {
