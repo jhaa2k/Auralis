@@ -38,6 +38,8 @@ import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -59,6 +61,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -126,6 +129,10 @@ fun AuralisApp() {
     val editorLayers = remember { mutableStateListOf(EditorLayer(1, "Composition", "Main Composition"), EditorLayer(2, "Bars", "Spectrum Bars")) }
     var selectedLayerId by remember { mutableIntStateOf(2) }
     var selectedPropertyCategory by remember { mutableStateOf("GENERAL") }
+    var detailsModule by remember { mutableStateOf<String?>(null) }
+    var detailsLayerId by remember { mutableIntStateOf(-1) }
+    val modulePropertyValues = remember { mutableStateMapOf<String, String>() }
+    var pendingImageField by remember { mutableStateOf("Pick Image") }
     var nextLayerId by remember { mutableIntStateOf(3) }
     var addLayerMenuExpanded by remember { mutableStateOf(false) }
     var fftLower by remember { mutableFloatStateOf(0.02f) }
@@ -289,6 +296,7 @@ fun AuralisApp() {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             val index = editorLayers.indexOfFirst { it.id == selectedLayerId }
             if (index >= 0) editorLayers[index] = editorLayers[index].copy(imageUri = uri.toString())
+            modulePropertyValues["$selectedLayerId/$pendingImageField"] = uri.toString()
         }
     }
 
@@ -579,6 +587,20 @@ fun AuralisApp() {
                                                     editorLayers.add(layer)
                                                     selectedLayerId = layer.id
                                                 }
+                                                detailsLayerId = selectedLayerId
+                                                detailsModule = when(type) {
+                                                    "Composition" -> "COMPOSITION"
+                                                    "Text" -> "TEXT"
+                                                    "Bars" -> "BARS"
+                                                    "Particles" -> "PARTICLES"
+                                                    "Image" -> "IMAGE"
+                                                    "Audio Provider" -> "AUDIOPROVIDER"
+                                                    "Blur Effect" -> "BLUREFFECT"
+                                                    "RGB Split" -> "RGBSPLITEFFECT"
+                                                    "Motion Blur" -> "MOTIONBLUREFFECT"
+                                                    "Mirror Effect" -> "MIRROREFFECT"
+                                                    else -> "CUSTOMSHADER"
+                                                }
                                                 selectedTab = if (type == "Audio Provider") 2 else 1
                                                 selectedPropertyCategory = "GENERAL"
                                             }
@@ -613,7 +635,7 @@ fun AuralisApp() {
                                         Text(layer.name, color = StudioWhite, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
                                         Text(layer.type.uppercase(Locale.US), color = StudioMuted, fontSize = 7.sp)
                                     }
-                                    Button(onClick = { selectedLayerId = layer.id }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 7.dp, vertical = 2.dp), colors = ButtonDefaults.buttonColors(containerColor = if (layer.id == selectedLayerId) StudioAccent else StudioPanel, contentColor = if (layer.id == selectedLayerId) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("EDIT", fontSize = 8.sp) }
+                                    Button(onClick = { selectedLayerId = layer.id; detailsLayerId = layer.id; detailsModule = moduleKeyForLayer(layer.type) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 7.dp, vertical = 2.dp), colors = ButtonDefaults.buttonColors(containerColor = if (layer.id == selectedLayerId) StudioAccent else StudioPanel, contentColor = if (layer.id == selectedLayerId) StudioBlack else StudioWhite), shape = RoundedCornerShape(2.dp)) { Text("EDIT", fontSize = 8.sp) }
                                     Button(onClick = { editorLayers[index] = layer.copy(visible = !layer.visible) }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioPanel), shape = RoundedCornerShape(2.dp)) { Text(if (layer.visible) "ON" else "OFF", fontSize = 8.sp, color = StudioWhite) }
                                     Button(onClick = { if (editorLayers.size > 1) { editorLayers.removeAt(index); if (selectedLayerId == layer.id) selectedLayerId = editorLayers.last().id } }, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp), colors = ButtonDefaults.buttonColors(containerColor = StudioPanel), shape = RoundedCornerShape(2.dp)) { Text("×", fontSize = 11.sp, color = StudioWhite) }
                                 }
@@ -843,6 +865,35 @@ fun AuralisApp() {
             }
         }
     }
+
+    // A full-screen property route sits above the studio and keeps values keyed by layer ID.
+    val activeModule = detailsModule
+    if (activeModule != null && detailsLayerId > 0) {
+        Dialog(onDismissRequest = { detailsModule = null }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+            ModuleDetailsScreen(
+                module = activeModule,
+                layerId = detailsLayerId,
+                values = modulePropertyValues,
+                onBack = { detailsModule = null },
+                onReset = { modulePropertyValues.keys.filter { it.startsWith("$detailsLayerId/") }.forEach { modulePropertyValues.remove(it) } },
+                onPickImage = { field -> pendingImageField = field; imagePicker.launch(arrayOf("image/*")) }
+            )
+        }
+    }
+}
+
+private fun moduleKeyForLayer(type: String): String = when(type) {
+    "Composition" -> "COMPOSITION"
+    "Text" -> "TEXT"
+    "Bars" -> "BARS"
+    "Particles" -> "PARTICLES"
+    "Image" -> "IMAGE"
+    "Audio Provider" -> "AUDIOPROVIDER"
+    "Blur Effect" -> "BLUREFFECT"
+    "RGB Split" -> "RGBSPLITEFFECT"
+    "Motion Blur" -> "MOTIONBLUREFFECT"
+    "Mirror Effect" -> "MIRROREFFECT"
+    else -> "CUSTOMSHADER"
 }
 
 @Composable
