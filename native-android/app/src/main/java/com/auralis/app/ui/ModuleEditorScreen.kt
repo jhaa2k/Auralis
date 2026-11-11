@@ -348,8 +348,12 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
         fun number(name: String, fallback: Float): Float = raw(name, fallback.toString()).toFloatOrNull() ?: fallback
         fun flag(name: String, fallback: Boolean = false): Boolean = raw(name, fallback.toString()).toBooleanStrictOrNull() ?: fallback
         fun argb(name: String, fallback: Long): Long = runCatching {
-            android.graphics.Color.parseColor(raw(name, String.format("#%08X", fallback))) .toLong() and 0xFFFFFFFFL
+            android.graphics.Color.parseColor(raw(name, String.format("#%08X", fallback))).toLong() and 0xFFFFFFFFL
         }.getOrDefault(fallback)
+        val compositionBackground = layers.firstOrNull { it.type == "COMPOSITION" }?.let { composition ->
+            val compositionKey = "layer_${composition.id}_${composition.type}"
+            runCatching { android.graphics.Color.parseColor(values["$compositionKey.backgroundColor"] ?: values["COMPOSITION.backgroundColor"] ?: "#FF000000").toLong() and 0xFFFFFFFFL }.getOrDefault(0xFF000000L)
+        } ?: 0xFF101116L
         val visible = flag("visible", true)
         val measurePosition = MeasureWhat.fromLabel(raw("measurePos", "Nothing"))
         val measureScale = MeasureWhat.fromLabel(raw("measureScale", "Nothing"))
@@ -381,9 +385,11 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             if (enabled) (values["$effectKey.blurAmount"] ?: "0.2").toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f else 0f
         } ?: 0f
         return when (layer.type) {
+            "COMPOSITION" -> VisualizerSettings(backgroundColor = compositionBackground, barsEnabled = false)
             "BARS" -> {
                 val segments = (1..3).count { flag("segment${it}Enabled", it == 1) }.coerceAtLeast(1)
                 VisualizerSettings(
+                    backgroundColor = compositionBackground,
                     barCount = number("barCount", 64f).toInt().coerceIn(16, 128),
                     barWidth = number("barWidth", 0.72f).coerceIn(0.15f, 1f),
                     barHeight = number("heightScale", 1f).coerceIn(0.1f, 2f),
@@ -414,6 +420,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 )
             }
             "PARTICLES" -> VisualizerSettings(
+                backgroundColor = compositionBackground,
                 positionX = number("positionX", 0.5f),
                 positionY = number("positionY", 0.5f),
                 particlesEnabled = visible,
