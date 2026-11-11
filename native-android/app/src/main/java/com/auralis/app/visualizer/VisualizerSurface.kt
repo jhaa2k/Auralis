@@ -190,6 +190,12 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         }
         previousBassEnergy = previousBassEnergy * 0.72f + bassEnergy * 0.28f
         configs.forEachIndexed { layerIndex, config ->
+        when (config.blendMode) {
+            "Add" -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE)
+            "Screen" -> GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_COLOR)
+            "Multiply" -> GLES20.glBlendFunc(GLES20.GL_DST_COLOR, GLES20.GL_ZERO)
+            else -> GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        }
         val positionSignal = measureSignal(config.positionMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val scaleSignal = measureSignal(config.scaleMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
         val rotationSignal = measureSignal(config.rotationMeasure, elapsedSeconds, data.average().toFloat(), beatPulse, config.trackPositionFraction)
@@ -201,7 +207,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         val amount = config.measureAmount
         val effectivePositionX = (config.positionX + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
         val effectivePositionY = (config.positionY + (positionSignal - 0.5f) * amount * 0.6f).coerceIn(-1f, 2f)
-        val effectiveScale = (config.scale * (1f + (scaleSignal - 0.5f) * amount)).coerceIn(0.1f, 3f)
+        val scaleMeasureFactor = (1f + (scaleSignal - 0.5f) * amount).coerceIn(0.1f, 3f)
+        val effectiveScaleX = (config.scale * config.scaleX * scaleMeasureFactor).coerceIn(0.1f, 6f)
+        val effectiveScaleY = (config.scale * config.scaleY * scaleMeasureFactor).coerceIn(0.1f, 6f)
         val effectiveRotation = config.rotation + (rotationSignal - 0.5f) * amount * 90f
         val segmentCount = config.segmentCount.coerceIn(1, 32)
         val segmentGap = config.segmentGap.coerceIn(0f, 0.45f)
@@ -236,8 +244,8 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val angle = Math.toRadians(effectiveRotation.toDouble())
                 val cosine = cos(angle).toFloat()
                 val sine = sin(angle).toFloat()
-                val localX = x * effectiveScale
-                val localY = y * effectiveScale
+                val localX = x * effectiveScaleX
+                val localY = y * effectiveScaleY
                 val centerX = (effectivePositionX - 0.5f) * 2f
                 val centerY = (0.5f - effectivePositionY) * 2f
                 vertices[offset++] = localX * cosine - localY * sine + centerX
@@ -480,7 +488,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val tintG = if (mirrorCopy) colorChannel(config.mirrorColor, 8) else 1f
                 val tintB = if (mirrorCopy) colorChannel(config.mirrorColor, 0) else 1f
                 val tintA = if (mirrorCopy) colorChannel(config.mirrorColor, 24) else 1f
-                points.put(px + offsetX); points.put(py + offsetY)
+                points.put((px + offsetX) * config.scale * config.scaleX); points.put((py + offsetY) * config.scale * config.scaleY)
                 points.put(colorChannel(color, 16) * tintR)
                 points.put(colorChannel(color, 8) * tintG)
                 points.put(colorChannel(color, 0) * tintB)
