@@ -151,10 +151,34 @@ fun AuralisApp() {
     var nextLayerId by remember { mutableIntStateOf(3) }
 
     LaunchedEffect(context) {
+        val savedProperties = restoreModuleProperties(context)
+        modulePropertyValues.putAll(savedProperties)
         val savedLayers = restoreLayerRegistry(context)
         if (savedLayers.isNotEmpty()) {
             editorLayers.clear()
-            editorLayers.addAll(savedLayers.map { EditorLayer(it.id, it.type, it.name) })
+            editorLayers.addAll(savedLayers.map { record ->
+                fun property(group: String, name: String) = savedProperties["${record.id}/$group/$name"]
+                val base = EditorLayer(record.id, record.type, record.name)
+                val imageUri = property("Image", "Pick Image")
+                    ?: property("Appearance", "Target Image")
+                    ?: property("Appearance", "Custom Image")
+                    ?: property("Appearance", "Target Image")
+                base.copy(
+                    visible = property("General", "Visible")?.toBoolean() ?: base.visible,
+                    x = property("General", "Position X")?.toFloatOrNull()?.coerceIn(0f, 1f) ?: base.x,
+                    y = property("General", "Position Y")?.toFloatOrNull()?.coerceIn(0f, 1f) ?: base.y,
+                    scale = property("General", "Scale X")?.toFloatOrNull()?.coerceIn(0.1f, 3f)
+                        ?: property("General", "Scale Y")?.toFloatOrNull()?.coerceIn(0.1f, 3f) ?: base.scale,
+                    rotation = property("General", "Rotation")?.toFloatOrNull()?.coerceIn(-360f, 360f) ?: base.rotation,
+                    opacity = property("Appearance", "Opacity")?.toFloatOrNull()?.coerceIn(0f, 1f) ?: base.opacity,
+                    textContent = property("Appearance", "Text") ?: base.textContent,
+                    fontSize = property("Appearance", "Font Size")?.toFloatOrNull()?.coerceIn(8f, 96f) ?: base.fontSize,
+                    textColor = property("Appearance", "Color")?.let { runCatching { android.graphics.Color.parseColor(it).toLong() }.getOrNull() } ?: base.textColor,
+                    imageUri = imageUri,
+                    imageFitMode = if (property("Image", "Crop to Fit")?.toBoolean() == true) "CROP_TO_FIT" else base.imageFitMode,
+                    rgbSplitAmount = property("Appearance", "Split Multiplier")?.toFloatOrNull()?.coerceIn(0f, 1f) ?: base.rgbSplitAmount
+                )
+            })
             nextLayerId = (savedLayers.maxOfOrNull { it.id } ?: 0) + 1
             selectedLayerId = editorLayers.lastOrNull()?.id ?: 1
         }
