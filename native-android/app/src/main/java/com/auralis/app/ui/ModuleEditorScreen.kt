@@ -367,6 +367,11 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             val compositionKey = "layer_${composition.id}_${composition.type}"
             runCatching { android.graphics.Color.parseColor(values["$compositionKey.backgroundColor"] ?: values["COMPOSITION.backgroundColor"] ?: "#FF000000").toLong() and 0xFFFFFFFFL }.getOrDefault(0xFF000000L)
         } ?: 0xFF101116L
+        val compositionLayerKey = layers.firstOrNull { it.type == "COMPOSITION" }?.let { "layer_${it.id}_${it.type}" } ?: "COMPOSITION"
+        val compositionAlpha = (values["$compositionLayerKey.alpha"] ?: values["COMPOSITION.alpha"] ?: "1")
+            .toFloatOrNull()?.coerceIn(0f, 1f) ?: 1f
+        val clearCanvas = (values["$compositionLayerKey.clearCanvas"] ?: values["COMPOSITION.clearCanvas"] ?: "true")
+            .toBooleanStrictOrNull() ?: true
         val visible = flag("visible", true)
         val measurePosition = MeasureWhat.fromLabel(raw("measurePos", "Nothing"))
         val measureScale = MeasureWhat.fromLabel(raw("measureScale", "Nothing"))
@@ -407,7 +412,7 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             if (enabled) (values["$effectKey.blurAmount"] ?: "0.2").toFloatOrNull()?.coerceIn(0f, 1f) ?: 0f else 0f
         } ?: 0f
         return when (layer.type) {
-            "COMPOSITION" -> VisualizerSettings(backgroundColor = compositionBackground, barsEnabled = false)
+            "COMPOSITION" -> VisualizerSettings(backgroundColor = compositionBackground, compositionAlpha = compositionAlpha, clearCanvas = clearCanvas, barsEnabled = false)
             "BARS" -> {
                 val segmentStyles = (1..3).map { index ->
                     BarSegmentStyle(
@@ -425,6 +430,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
                 val firstSegment = activeSegments.first()
                 VisualizerSettings(
                     backgroundColor = compositionBackground,
+                    compositionAlpha = compositionAlpha,
+                    clearCanvas = clearCanvas,
                     barCount = number("barCount", 64f).toInt().coerceIn(16, 128),
                     barWidth = number("barWidth", 0.72f).coerceIn(0.15f, 1f),
                     barHeight = number("heightScale", 1f).coerceIn(0.1f, 2f),
@@ -464,6 +471,8 @@ fun ModuleEditorScreen(store: ModuleSettingsStore = viewModel()) {
             }
             "PARTICLES" -> VisualizerSettings(
                 backgroundColor = compositionBackground,
+                compositionAlpha = compositionAlpha,
+                clearCanvas = clearCanvas,
                 positionX = number("positionX", 0.5f),
                 positionY = number("positionY", 0.5f),
                 particlesEnabled = visible,
