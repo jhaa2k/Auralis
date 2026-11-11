@@ -26,6 +26,12 @@ class VisualizerSurface(context: Context) : GLSurfaceView(context) {
     fun submitSpectrum(values: FloatArray) = visualizerRenderer.submit(values)
     fun updateSettings(settings: VisualizerSettings) = visualizerRenderer.update(settings)
     fun updateLayers(settings: List<VisualizerSettings>) = visualizerRenderer.updateLayers(settings)
+    fun applyCustomShader(vertexSource: String, fragmentSource: String, onResult: (Boolean, String?) -> Unit) {
+        queueEvent {
+            val error = visualizerRenderer.applyCustomShader(vertexSource, fragmentSource)
+            post { onResult(error == null, error) }
+        }
+    }
 }
 
 private class SpectrumGlRenderer : GLSurfaceView.Renderer {
@@ -59,6 +65,27 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         settings = values.map { it.sanitized() }.ifEmpty { listOf(VisualizerSettings(barsEnabled = false)) }
     }
 
+    fun applyCustomShader(vertexSource: String, fragmentSource: String): String? = runCatching {
+        require(vertexSource.isNotBlank()) { "Vertex shader is empty." }
+        require(fragmentSource.isNotBlank()) { "Fragment shader is empty." }
+        val vertex = compileShader(GLES20.GL_VERTEX_SHADER, vertexSource)
+        val fragment = compileShader(GLES20.GL_FRAGMENT_SHADER, fragmentSource)
+        val nextProgram = linkProgram(vertex, fragment)
+        val nextPosition = GLES20.glGetAttribLocation(nextProgram, "aPosition")
+        val nextColor = GLES20.glGetAttribLocation(nextProgram, "aColor")
+        require(nextPosition >= 0 && nextColor >= 0) { "Shader must expose aPosition and aColor attributes." }
+        val oldProgram = program
+        program = nextProgram
+        positionHandle = nextPosition
+        colorHandle = nextColor
+        pointSizeHandle = GLES20.glGetUniformLocation(nextProgram, "uPointSize")
+        roundPointHandle = GLES20.glGetUniformLocation(nextProgram, "uRoundPoint")
+        offsetHandle = GLES20.glGetUniformLocation(nextProgram, "uOffset")
+        tintHandle = GLES20.glGetUniformLocation(nextProgram, "uTint")
+        if (oldProgram != 0) GLES20.glDeleteProgram(oldProgram)
+        GLES20.glDeleteShader(vertex)
+        GLES20.glDeleteShader(fragment)
+    }.exceptionOrNull()?.message
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0.025f, 0.027f, 0.035f, 1f)
         val vertexShader = """
