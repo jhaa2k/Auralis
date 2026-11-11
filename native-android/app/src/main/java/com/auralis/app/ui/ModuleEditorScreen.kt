@@ -1342,7 +1342,7 @@ private fun LayersPanel(
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(layer.name.uppercase(), color = if (active) EditorAccent else EditorText, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(spec?.title ?: layer.type, color = EditorMuted, fontSize = 8.sp, letterSpacing = 0.4.sp)
+                            Text((spec?.title ?: layer.type).uppercase(), color = EditorMuted, fontSize = 8.sp, letterSpacing = 0.4.sp)
                         }
                         val layerKey = if (layer.id == 1 && layer.type == "BARS") "BARS" else "layer_${layer.id}_${layer.type}"
                         val visible = (values["$layerKey.visible"] ?: "true").toBooleanStrictOrNull() ?: true
@@ -1392,7 +1392,7 @@ private fun AudioPanel(
             letterSpacing = 0.8.sp
         )
         Text(
-            "Use a track from your device. Auralis analyses the audio from its own player session.",
+            "USE A TRACK FROM YOUR DEVICE. AURALIS ANALYSES AUDIO FROM ITS OWN PLAYER SESSION.",
             color = EditorMuted,
             fontSize = 9.sp
         )
@@ -1555,7 +1555,7 @@ private fun ExportPanel(
                 letterSpacing = 0.9.sp
             )
             Text(
-                "Choose a frame shape, output size and frame rate.",
+                "CHOOSE A FRAME SHAPE, OUTPUT SIZE AND FRAME RATE.",
                 color = EditorMuted,
                 fontSize = 9.sp
             )
@@ -1629,7 +1629,7 @@ private fun ExportPanel(
                 )
             }
             Text(
-                "Export currently renders the active spectrum-video pipeline with the selected audio track.",
+                "EXPORT RENDERS THE ACTIVE SPECTRUM VIDEO PIPELINE WITH THE SELECTED AUDIO TRACK.",
                 color = EditorMuted,
                 fontSize = 8.sp
             )
@@ -1811,7 +1811,7 @@ private fun SettingControl(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     supportingText = {
-                        Text("ARGB hex · #AARRGGBB", fontSize = 8.sp)
+                        Text("ARGB HEX · #AARRGGBB", fontSize = 8.sp)
                     },
                     leadingIcon = {
                         val parsed = remember(value) {
