@@ -120,6 +120,8 @@ fun AuralisApp() {
     var particleSpread by remember { mutableFloatStateOf(0.40f) }
     var barWidth by remember { mutableFloatStateOf(0.67f) }
     var barHeight by remember { mutableFloatStateOf(0.47f) }
+    var segmentCountValue by remember { mutableFloatStateOf(0f) }
+    var segmentGapValue by remember { mutableFloatStateOf(0.40f) }
 
     // These editor values are UI state. They will be connected to the render engine in a later phase.
     var sensitivity by remember { mutableFloatStateOf(0.65f) }
@@ -306,6 +308,8 @@ fun AuralisApp() {
                             barCount = (12 + barCount * 116).toInt(),
                             barWidth = 0.15f + barWidth * 0.85f,
                             barHeight = 0.1f + barHeight * 1.9f,
+                            segmentCount = 1 + (segmentCountValue * 31f).toInt(),
+                            segmentGap = segmentGapValue * 0.45f,
                             sensitivity = 0.35f + sensitivity * 2.65f,
                             smoothing = smoothing * 0.9f,
                             glow = glow,
@@ -530,7 +534,9 @@ fun AuralisApp() {
                                     Text("BAR GEOMETRY", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                                     PropertySlider("Bar width", barWidth, { barWidth = it }, "THIN", "WIDE", "${(15 + barWidth * 85).toInt()}%", resetValue = 0.67f)
                                     PropertySlider("Bar height", barHeight, { barHeight = it }, "SHORT", "TALL", "${(10 + barHeight * 190).toInt()}%", resetValue = 0.47f)
-                                    PropertyInfoRow("Geometry", "Independent width / height scaling")
+                                    PropertySlider("Segments per bar", segmentCountValue, { segmentCountValue = it }, "1", "32", "${1 + (segmentCountValue * 31f).toInt()}", resetValue = 0f)
+                                    PropertySlider("Segment spacing", segmentGapValue, { segmentGapValue = it }, "TIGHT", "WIDE", "${(segmentGapValue * 45).toInt()}%", resetValue = 0.40f)
+                                    PropertyInfoRow("Geometry", "Width, height, segment count and spacing")
                                 }
                                 if (selected.type == "Particles") {
                                     PropertySlider("Particle count", particleCount, { particleCount = it }, "20", "400", "${(20 + particleCount * 380).toInt()}", resetValue = 0.30f)
