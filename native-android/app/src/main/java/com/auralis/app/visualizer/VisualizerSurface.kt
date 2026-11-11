@@ -260,11 +260,11 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val cy = (bottom + top) * 0.5f
                 val rx = (right - left) * 0.5f
                 val ry = (top - bottom) * 0.5f
-                val points = ArrayList<Offset>(sides)
+                val points = ArrayList<Pair<Float, Float>>(sides)
                 for (point in 0 until sides) {
                     val angle = -Math.PI / 2.0 + point * Math.PI * 2.0 / sides
                     val radius = if (star && point % 2 == 1) 0.42f else 1f
-                    points.add(Offset(
+                    points.add(Pair(
                         cx + cos(angle).toFloat() * rx * radius,
                         cy + sin(angle).toFloat() * ry * radius
                     ))
@@ -272,7 +272,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 for (point in points.indices) {
                     val next = points[(point + 1) % points.size]
                     val current = points[point]
-                    appendTriangle(cx, cy, current.x, current.y, next.x, next.y, a, r, g, b)
+                    appendTriangle(cx, cy, current.first, current.second, next.first, next.second, a, r, g, b)
                 }
             }
             fun appendShape(
@@ -340,8 +340,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     if (config.mirrorX) drawAt(-x1, segmentBottom, -x0, segmentTop)
                     if (config.mirrorX && (style.mirror || config.mirror)) drawAt(-x1, -segmentTop, -x0, -segmentBottom)
                     if (style.flipOther && i % 2 == 1) {
-                        drawAt(x0, segmentCursor + actualHeight - (segmentTop - segmentCursor),
-                            x1, segmentCursor + actualHeight - (segmentBottom - segmentCursor))
+                        drawAt(-x1, segmentBottom, -x0, segmentTop)
                     }
                 }
                 segmentCursor += actualHeight
