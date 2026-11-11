@@ -1925,12 +1925,13 @@ private fun ThinValueSlider(
     val currentValue = value.coerceIn(minValue, maxValue)
     val density = androidx.compose.ui.platform.LocalDensity.current
     val insetPx = with(density) { 6.dp.toPx() }
+    val latestOnValueChange = rememberUpdatedState(onValueChange)
 
     fun updateFromX(x: Float, width: Int) {
         val usableWidth = (width.toFloat() - insetPx * 2f).coerceAtLeast(1f)
         val fraction = ((x - insetPx) / usableWidth).coerceIn(0f, 1f)
         val next = (minValue + safeRange * fraction).coerceIn(minValue, maxValue)
-        onValueChange(next)
+        latestOnValueChange.value(next)
     }
 
     Canvas(
