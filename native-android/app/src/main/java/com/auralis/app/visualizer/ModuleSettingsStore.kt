@@ -2,12 +2,9 @@ package com.auralis.app.visualizer
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 /**
@@ -21,18 +18,24 @@ class ModuleSettingsStore(application: Application) : AndroidViewModel(applicati
     val values: StateFlow<Map<String, String>> = _values.asStateFlow()
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            val raw = preferences.getString("settings_json", "{}") ?: "{}"
-            val json = runCatching { JSONObject(raw) }.getOrDefault(JSONObject())
-            val restored = buildMap {
-                val keys = json.keys()
-                while (keys.hasNext()) {
-                    val key = keys.next()
-                    put(key, json.optString(key, ""))
-                }
-            }
-            _values.value = restored
+        // SharedPreferences.getString is a memory read. Restore synchronously so the first
+        // Compose frame never sees empty defaults and overwrites a user's saved values.
+        val raw = preferences.getString("settings_json", "{}") ?: "{}"
+        val json = runCatching { JSONObject(raw) }.getOrDefault(JSONObject())
+        val restored = linkedMapOf<String, String>()
+        val keys = json.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            restored[key] = json.optString(key, "")
         }
+        _values.value = restored
+    }
+
+    private fun persist(snapshot: Map<String, String>) {
+        val json = JSONObject()
+        snapshot.forEach { (key, value) -> json.put(key, value) }
+        // apply() updates the in-memory preference immediately and writes on the disk thread.
+        preferences.edit().putString("settings_json", json.toString()).apply()
     }
 
     fun value(moduleId: String, spec: SettingSpec): String =
@@ -50,22 +53,14 @@ class ModuleSettingsStore(application: Application) : AndroidViewModel(applicati
         val key = "$moduleId.${spec.key}"
         val next = _values.value.toMutableMap().apply { put(key, value) }
         _values.value = next
-        viewModelScope.launch(Dispatchers.IO) {
-            val json = JSONObject()
-            next.forEach { (k, v) -> json.put(k, v) }
-            preferences.edit().putString("settings_json", json.toString()).apply()
-        }
+        persist(next)
     }
 
     fun reset(moduleId: String, groups: List<SettingGroup>) {
         val next = _values.value.toMutableMap()
         groups.flatMap { it.settings }.forEach { next.remove("$moduleId.${it.key}") }
         _values.value = next
-        viewModelScope.launch(Dispatchers.IO) {
-            val json = JSONObject()
-            next.forEach { (k, v) -> json.put(k, v) }
-            preferences.edit().putString("settings_json", json.toString()).apply()
-        }
+        persist(next)
     }
 
     fun exportJson(): String = JSONObject().apply {
