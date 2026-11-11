@@ -504,8 +504,14 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val randomB = (abs(sin(seed * 78.233f) * 19341.381f) % 1f)
                 val seedAngle = seed * 2.3999632f
                 val life = config.particleLifetime.coerceAtLeast(0.1f)
-                val phase = (((now / life) + randomA) % 1.0).toFloat().coerceIn(0f, 1f)
+                val emissionOffset = i.toFloat() * config.particleSpawnTime
+                val phase = ((((now - emissionOffset) / life) + randomA) % 1.0).toFloat().coerceIn(0f, 1f)
                 val spawnRadius = sqrt(randomB)
+                val cameraDepth = config.particlePerspectiveDepth * (0.4f + randomB * 0.6f)
+                val perspectiveFactor = (config.particlePerspectiveFov / (config.particlePerspectiveFov + cameraDepth * 0.1f)).coerceIn(0.1f, 1f)
+                val nearFadeFactor = (cameraDepth / (cameraDepth + config.particleNearCameraFade.coerceAtLeast(0f))).coerceIn(0.05f, 1f)
+                val particleSpeedSignal = measureSignal(config.particleSpeedMeasure, elapsedSeconds, energy, beatPulse, config.trackPositionFraction)
+                val particleSpeedFactor = (1f + (particleSpeedSignal - 0.5f) * 0.8f).coerceIn(0.1f, 2f)
                 val spawn = when (config.particleSpawnArea) {
                     "Circle" -> Pair(cos(seedAngle) * spawnRadius * config.particleSpread * 0.5f, sin(seedAngle) * spawnRadius * config.particleSpreadY * 0.5f)
                     "Line" -> Pair((randomA - 0.5f) * config.particleSpread, 0f)
@@ -522,7 +528,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val directionX = cos(direction).toFloat()
                 val directionY = sin(direction).toFloat()
                 val randomSpeed = (1f + (randomA * 2f - 1f) * config.particleSpeedRandom / 10f).coerceAtLeast(0f)
-                val travel = (phase - 0.5f) * config.particleSpeed * randomSpeed * 0.42f
+                val travel = (phase - 0.5f) * config.particleSpeed * randomSpeed * particleSpeedFactor * perspectiveFactor * 0.42f
                 var baseX = spawn.first + directionX * travel
                 var baseY = spawn.second + directionY * travel
 
@@ -546,8 +552,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                     }
                 }
 
-                val wave = sin(phase * config.particleWaveFrequency * 6.2831853f + seedAngle) *
-                    config.particleWaveMagnitude * 0.025f
+                val waveFrequency = (config.particleWaveFrequency + randomA * config.particleWaveFrequencyRandom).coerceIn(0f, 50f)
+                val waveMagnitude = (config.particleWaveMagnitude + (randomB * 2f - 1f) * config.particleWaveMagnitudeRandom).coerceIn(0f, 10f)
+                val wave = sin(phase * waveFrequency * 6.2831853f + seedAngle) * waveMagnitude * 0.025f
                 baseX += -directionY * wave
                 baseY += directionX * wave
 
@@ -559,7 +566,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val fadeIn = if (fadeWindow <= 0f) 1f else (phase / fadeWindow).coerceIn(0f, 1f)
                 val fadeOut = if (fadeWindow <= 0f) 1f else ((1f - phase) / fadeWindow).coerceIn(0f, 1f)
                 val energyAlpha = 0.30f + energy * 0.70f
-                val alpha = config.particleOpacity * config.compositionAlpha * energyAlpha * fadeIn * fadeOut
+                val alpha = config.particleOpacity * config.compositionAlpha * energyAlpha * fadeIn * fadeOut * nearFadeFactor
                 val t = phase.coerceIn(0f, 1f)
                 fun lerpChannel(shift: Int) =
                     colorChannel(config.particleColor, shift) +
@@ -571,8 +578,9 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val startSize = if (config.particleFadeInSize > 0f) config.particleFadeInSize else config.particleSize
                 val randomEndSize = (config.particleEndSize +
                     (randomB * 2f - 1f) * config.particleEndSizeRandom).coerceIn(0f, 64f)
+                val zSizeFactor = 1f + config.particleEndSizeZFactor * (1f - perspectiveFactor) * 0.05f
                 val particlePointSize = (startSize + (randomEndSize - startSize) * phase) *
-                    particleScale * (0.75f + fadeIn * 0.25f)
+                    particleScale * (0.75f + fadeIn * 0.25f) * perspectiveFactor * zSizeFactor
 
                 val particleAngle = if (config.particleVelocityAngle) direction.toFloat() else particleRotation.toFloat()
                 appendParticle(x, y, color, alpha, particlePointSize, particleAngle)
