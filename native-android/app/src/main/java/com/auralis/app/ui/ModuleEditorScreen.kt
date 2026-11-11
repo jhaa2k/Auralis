@@ -1112,16 +1112,11 @@ private fun AudioPanel(
                     }
                 }
 
-                Slider(
+                ThinValueSlider(
                     value = if (duration > 0L) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f,
+                    valueRange = 0f..1f,
                     onValueChange = onSeek,
-                    enabled = hasTrack && duration > 0L,
-                    colors = SliderDefaults.colors(
-                        thumbColor = EditorAccent,
-                        activeTrackColor = EditorAccent,
-                        inactiveTrackColor = EditorLine
-                    ),
-                    modifier = Modifier.height(28.dp)
+                    enabled = hasTrack && duration > 0L
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(formatEditorTime(position), color = EditorMuted, fontSize = 8.sp, modifier = Modifier.weight(1f))
@@ -1411,16 +1406,10 @@ private fun SettingControl(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
-                Slider(
+                ThinValueSlider(
                     value = numeric,
-                    onValueChange = { onValueChange(it.toString()) },
                     valueRange = min..max,
-                    colors = SliderDefaults.colors(
-                        thumbColor = EditorAccent,
-                        activeTrackColor = EditorAccent,
-                        inactiveTrackColor = EditorLine
-                    ),
-                    modifier = Modifier.height(31.dp)
+                    onValueChange = { onValueChange(it.toString()) }
                 )
             }
 
@@ -1569,6 +1558,66 @@ private fun SettingControl(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun ThinValueSlider(
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onValueChange: (Float) -> Unit,
+    enabled: Boolean = true
+) {
+    val minValue = valueRange.start
+    val maxValue = valueRange.endInclusive
+    val currentValue = value.coerceIn(minValue, maxValue)
+
+    fun updateFromX(x: Float, width: Int) {
+        if (width <= 0 || maxValue <= minValue) return
+        val fraction = (x / width.toFloat()).coerceIn(0f, 1f)
+        onValueChange(minValue + (maxValue - minValue) * fraction)
+    }
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(27.dp)
+            .pointerInput(enabled, minValue, maxValue) {
+                if (enabled) detectTapGestures { updateFromX(it.x, size.width) }
+            }
+            .pointerInput(enabled, minValue, maxValue) {
+                if (enabled) detectDragGestures(
+                    onDragStart = { updateFromX(it.x, size.width) },
+                    onDrag = { change, _ -> updateFromX(change.position.x, size.width) }
+                )
+            }
+    ) {
+        val inset = 5.dp.toPx()
+        val trackStart = inset
+        val trackEnd = size.width - inset
+        val centerY = size.height / 2f
+        val fraction = ((currentValue - minValue) / (maxValue - minValue)).coerceIn(0f, 1f)
+        val thumbX = trackStart + (trackEnd - trackStart) * fraction
+        drawLine(
+            color = if (enabled) EditorLine else EditorLine.copy(alpha = 0.45f),
+            start = Offset(trackStart, centerY),
+            end = Offset(trackEnd, centerY),
+            strokeWidth = 2.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = if (enabled) EditorAccent else EditorMuted,
+            start = Offset(trackStart, centerY),
+            end = Offset(thumbX, centerY),
+            strokeWidth = 2.dp.toPx(),
+            cap = StrokeCap.Round
+        )
+        drawCircle(
+            color = if (enabled) EditorAccent else EditorMuted,
+            radius = 4.dp.toPx(),
+            center = Offset(thumbX, centerY)
+        )
     }
 }
 
