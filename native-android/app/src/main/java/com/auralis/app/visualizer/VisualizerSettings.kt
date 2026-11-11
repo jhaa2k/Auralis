@@ -17,6 +17,8 @@ data class VisualizerSettings(
     val particleSpeed: Float = 1f,
     val particleSize: Float = 3f,
     val particleSpread: Float = 0.8f,
+    val particleMirrorX: Boolean = false,
+    val particleMirrorY: Boolean = false,
     val positionMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val scaleMeasure: MeasureWhat = MeasureWhat.NOTHING,
     val rotationMeasure: MeasureWhat = MeasureWhat.NOTHING,
