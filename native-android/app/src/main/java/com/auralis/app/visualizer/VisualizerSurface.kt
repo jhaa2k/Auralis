@@ -12,6 +12,7 @@ import kotlin.math.max
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.min
+import kotlin.math.abs
 
 class VisualizerSurface(context: Context) : GLSurfaceView(context) {
     private val visualizerRenderer = SpectrumGlRenderer()
@@ -119,7 +120,7 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         offsetHandle = GLES20.glGetUniformLocation(program, "uOffset")
         tintHandle = GLES20.glGetUniformLocation(program, "uTint")
         vertexBuffer = ByteBuffer.allocateDirect(vertexCapacity * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        particleBuffer = ByteBuffer.allocateDirect(400 * 6 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        particleBuffer = ByteBuffer.allocateDirect(5000 * 4 * 6 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
@@ -280,7 +281,17 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
         }
 
         if (config.particlesEnabled && config.particleCount > 0) {
-            val points = particleBuffer ?: return
+            val mirrorCopies = 1 + (if (config.particleMirrorX) 1 else 0) +
+                (if (config.particleMirrorY) 1 else 0) +
+                (if (config.particleMirrorX && config.particleMirrorY) 1 else 0)
+            val tailCopies = if (config.particleTrailLength > 0f) 3 else 1
+            val requiredFloats = config.particleCount * mirrorCopies * tailCopies * 6
+            var points = particleBuffer
+            if (points == null || points.capacity() < requiredFloats) {
+                points = ByteBuffer.allocateDirect(requiredFloats * 4)
+                    .order(ByteOrder.nativeOrder()).asFloatBuffer()
+                particleBuffer = points
+            }
             points.clear()
             var renderedParticleCount = 0
             val now = System.nanoTime() / 1_000_000_000.0
@@ -291,38 +302,125 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
             val particleAmount = config.particleMeasureAmount
             val particleXOffset = (config.particlePositionX - 0.5f) * 2f + (particlePositionSignal - 0.5f) * particleAmount * 0.6f
             val particleYOffset = (0.5f - config.particlePositionY) * 2f - (particlePositionSignal - 0.5f) * particleAmount * 0.6f
-            val particleScale = (config.particleScale * (1f + (particleScaleSignal - 0.5f) * particleAmount)).coerceIn(0.1f, 3f)
+            val particleScale = (config.particleScale * (1f + (particleScaleSignal - 0.5f) * particleAmount)).coerceIn(0.1f, 4f)
             val particleRotation = Math.toRadians((config.particleRotation + (particleRotationSignal - 0.5f) * particleAmount * 90f).toDouble())
             val particleCos = cos(particleRotation).toFloat()
             val particleSin = sin(particleRotation).toFloat()
+
+            fun colorChannel(color: Long, shift: Int) = ((color shr shift) and 0xFF).toFloat() / 255f
+            fun appendParticle(px: Float, py: Float, color: Long, alphaMultiplier: Float) {
+                points.put(px); points.put(py)
+                points.put(colorChannel(color, 16))
+                points.put(colorChannel(color, 8))
+                points.put(colorChannel(color, 0))
+                points.put(colorChannel(color, 24) * alphaMultiplier)
+                renderedParticleCount++
+            }
+
             for (i in 0 until config.particleCount) {
-                val seed = i.toFloat()
-                val phase = ((now * config.particleSpeed * 0.12 + seed * 0.6180339) % 1.0).toFloat()
-                val angle = seed * 2.3999632f
-                val radial = (0.12f + ((seed * 0.7548776f) % 1f) * config.particleSpread) * (0.65f + energy * 0.75f)
-                val baseX = cos((angle + now.toFloat() * 0.10f * config.particleSpeed).toDouble()).toFloat() * radial
-                val baseY = phase * 2f - 1f + sin((angle * 1.7f + now.toFloat() * 0.4f).toDouble()).toFloat() * 0.08f
+                val seed = i.toFloat() + 1f
+                val randomA = (abs(sin(seed * 12.9898f) * 43758.5453f) % 1f)
+                val randomB = (abs(sin(seed * 78.233f) * 19341.381f) % 1f)
+                val seedAngle = seed * 2.3999632f
+                val life = config.particleLifetime.coerceAtLeast(0.1f)
+                val phase = (((now / life) + randomA) % 1.0).toFloat().coerceIn(0f, 1f)
+                val spawnRadius = sqrt(randomB)
+                val spawn = when (config.particleSpawnArea) {
+                    "Circle" -> Pair(cos(seedAngle) * spawnRadius, sin(seedAngle) * spawnRadius)
+                    "Line" -> Pair((randomA - 0.5f) * 1.8f, 0f)
+                    "Point" -> Pair(0f, 0f)
+                    else -> Pair((randomA - 0.5f) * 1.8f, (randomB - 0.5f) * 1.8f)
+                }
+                var direction = Math.toRadians(
+                    (if (config.particleRandomVector) randomB * 360f else config.particleVectorAngle).toDouble()
+                )
+                if (config.particleVectorRelative) {
+                    direction += kotlin.math.atan2(-spawn.second.toDouble(), -spawn.first.toDouble())
+                }
+                val directionX = cos(direction).toFloat()
+                val directionY = sin(direction).toFloat()
+                val randomSpeed = (1f + (randomA * 2f - 1f) * config.particleSpeedRandom / 10f).coerceAtLeast(0f)
+                val travel = (phase - 0.5f) * config.particleSpeed * randomSpeed * 0.42f
+                var baseX = spawn.first + directionX * travel
+                var baseY = spawn.second + directionY * travel
+
+                when (config.particleForceField) {
+                    "Gravity" -> {
+                        baseX += config.particleGravityX * phase * phase * 0.025f
+                        baseY += config.particleGravityY * phase * phase * 0.025f
+                    }
+                    "Wind" -> baseX += config.particleSpeed * phase * 0.09f
+                    "Vortex" -> {
+                        val vortexAngle = phase * 6.2831853f
+                        val vx = baseX * cos(vortexAngle) - baseY * sin(vortexAngle)
+                        val vy = baseX * sin(vortexAngle) + baseY * cos(vortexAngle)
+                        baseX = vx
+                        baseY = vy
+                    }
+                    "Attractor", "Repeller" -> {
+                        val directionToCenter = if (config.particleForceField == "Attractor") -1f else 1f
+                        baseX += baseX * directionToCenter * phase * 0.55f
+                        baseY += baseY * directionToCenter * phase * 0.55f
+                    }
+                }
+
+                val wave = sin(phase * config.particleWaveFrequency * 6.2831853f + seedAngle) *
+                    config.particleWaveMagnitude * 0.025f
+                baseX += -directionY * wave
+                baseY += directionX * wave
+
                 val localX = baseX * particleScale
                 val localY = baseY * particleScale
-                val x = (localX * particleCos - localY * particleSin + particleXOffset).coerceIn(-1.2f, 1.2f)
-                val y = (localX * particleSin + localY * particleCos + particleYOffset).coerceIn(-1.2f, 1.2f)
-                val alpha = (config.particleOpacity * (0.30f + energy * 0.70f) * (0.45f + ((seed * 0.31f) % 0.55f))).coerceIn(0f, 1f)
-                val red = ((config.particleColor shr 16) and 0xFF).toFloat() / 255f
-                val green = ((config.particleColor shr 8) and 0xFF).toFloat() / 255f
-                val blue = (config.particleColor and 0xFF).toFloat() / 255f
-                val finalAlpha = alpha * (((config.particleColor shr 24) and 0xFF).toFloat() / 255f)
-                fun appendParticle(px: Float, py: Float) {
-                    points.put(px); points.put(py); points.put(red); points.put(green); points.put(blue); points.put(finalAlpha)
-                    renderedParticleCount++
+                val x = (localX * particleCos - localY * particleSin + particleXOffset).coerceIn(-1.4f, 1.4f)
+                val y = (localX * particleSin + localY * particleCos + particleYOffset).coerceIn(-1.4f, 1.4f)
+                val fadeWindow = (config.particleFadeInOutTime / life).coerceIn(0f, 0.5f)
+                val fadeIn = if (fadeWindow <= 0f) 1f else (phase / fadeWindow).coerceIn(0f, 1f)
+                val fadeOut = if (fadeWindow <= 0f) 1f else ((1f - phase) / fadeWindow).coerceIn(0f, 1f)
+                val energyAlpha = 0.30f + energy * 0.70f
+                val alpha = config.particleOpacity * energyAlpha * fadeIn * fadeOut
+                val t = phase.coerceIn(0f, 1f)
+                fun lerpChannel(shift: Int) =
+                    colorChannel(config.particleColor, shift) +
+                        (colorChannel(config.particleColorTo, shift) - colorChannel(config.particleColor, shift)) * t
+                val color = ((lerpChannel(24) * 255f).toLong() shl 24) or
+                    ((lerpChannel(16) * 255f).toLong() shl 16) or
+                    ((lerpChannel(8) * 255f).toLong() shl 8) or
+                    (lerpChannel(0) * 255f).toLong()
+
+                appendParticle(x, y, color, alpha)
+                if (config.particleTrailLength > 0f) {
+                    val tailDistance = config.particleTrailLength * 0.003f
+                    appendParticle(x - directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f)
+                    appendParticle(x - directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f)
                 }
-                appendParticle(x, y)
-                if (config.particleMirrorX) appendParticle(-x, y)
-                if (config.particleMirrorY) appendParticle(x, -y)
-                if (config.particleMirrorX && config.particleMirrorY) appendParticle(-x, -y)
+                if (config.particleMirrorX) {
+                    appendParticle(-x, y, color, alpha)
+                    if (config.particleTrailLength > 0f) {
+                        val tailDistance = config.particleTrailLength * 0.003f
+                        appendParticle(-x + directionX * tailDistance, y - directionY * tailDistance, color, alpha * 0.42f)
+                        appendParticle(-x + directionX * tailDistance * 2f, y - directionY * tailDistance * 2f, color, alpha * 0.18f)
+                    }
+                }
+                if (config.particleMirrorY) {
+                    appendParticle(x, -y, color, alpha)
+                    if (config.particleTrailLength > 0f) {
+                        val tailDistance = config.particleTrailLength * 0.003f
+                        appendParticle(x - directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f)
+                        appendParticle(x - directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f)
+                    }
+                }
+                if (config.particleMirrorX && config.particleMirrorY) {
+                    appendParticle(-x, -y, color, alpha)
+                    if (config.particleTrailLength > 0f) {
+                        val tailDistance = config.particleTrailLength * 0.003f
+                        appendParticle(-x + directionX * tailDistance, -y + directionY * tailDistance, color, alpha * 0.42f)
+                        appendParticle(-x + directionX * tailDistance * 2f, -y + directionY * tailDistance * 2f, color, alpha * 0.18f)
+                    }
+                }
             }
             points.position(0)
             GLES20.glUniform1f(roundPointHandle, 1f)
-            GLES20.glUniform1f(pointSizeHandle, config.particleSize)
+            GLES20.glUniform1f(pointSizeHandle, config.particleSize * particleScale)
             GLES20.glUniform2f(offsetHandle, 0f, 0f)
             GLES20.glUniform4f(tintHandle, 1f, 1f, 1f, 1f)
             GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 24, points)
