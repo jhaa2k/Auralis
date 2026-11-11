@@ -355,10 +355,10 @@ private class SpectrumGlRenderer : GLSurfaceView.Renderer {
                 val phase = (((now / life) + randomA) % 1.0).toFloat().coerceIn(0f, 1f)
                 val spawnRadius = sqrt(randomB)
                 val spawn = when (config.particleSpawnArea) {
-                    "Circle" -> Pair(cos(seedAngle) * spawnRadius, sin(seedAngle) * spawnRadius)
-                    "Line" -> Pair((randomA - 0.5f) * 1.8f, 0f)
+                    "Circle" -> Pair(cos(seedAngle) * spawnRadius * config.particleSpread * 0.5f, sin(seedAngle) * spawnRadius * config.particleSpreadY * 0.5f)
+                    "Line" -> Pair((randomA - 0.5f) * config.particleSpread, 0f)
                     "Point" -> Pair(0f, 0f)
-                    else -> Pair((randomA - 0.5f) * 1.8f, (randomB - 0.5f) * 1.8f)
+                    else -> Pair((randomA - 0.5f) * config.particleSpread, (randomB - 0.5f) * config.particleSpreadY)
                 }
                 var direction = Math.toRadians(
                     ((if (config.particleRandomVector) randomB * 360f else config.particleVectorAngle) +
