@@ -471,10 +471,10 @@ fun AuralisApp() {
                 ) {
                     when (selectedTab) {
                         0 -> {
-                            PropertySlider("Sensitivity", sensitivity, { sensitivity = it }, "LOW", "HIGH", "${(sensitivity * 100).toInt()}%")
-                            PropertySlider("Bar count", barCount, { barCount = it }, "FEWER", "MORE", "${(12 + barCount * 116).toInt()}")
-                            PropertySlider("Smoothing", smoothing, { smoothing = it }, "FAST", "SMOOTH", "${(smoothing * 100).toInt()}%")
-                            PropertySlider("Opacity", layerOpacity, { layerOpacity = it }, "0%", "100%", "${(layerOpacity * 100).toInt()}%")
+                            PropertySlider("Sensitivity", sensitivity, { sensitivity = it }, "LOW", "HIGH", "${(sensitivity * 100).toInt()}%", resetValue = 0.65f)
+                            PropertySlider("Bar count", barCount, { barCount = it }, "FEWER", "MORE", "${(12 + barCount * 116).toInt()}", resetValue = 0.55f)
+                            PropertySlider("Smoothing", smoothing, { smoothing = it }, "FAST", "SMOOTH", "${(smoothing * 100).toInt()}%", resetValue = 0.35f)
+                            PropertySlider("Opacity", layerOpacity, { layerOpacity = it }, "0%", "100%", "${(layerOpacity * 100).toInt()}%", resetValue = 1f)
                             Text("Live app-audio FFT feeding the OpenGL spectrum renderer.", color = StudioMuted, fontSize = 8.sp)
                         }
                         1 -> {
@@ -509,29 +509,29 @@ fun AuralisApp() {
                             if (selectedIndex >= 0) {
                                 val selected = editorLayers[selectedIndex]
                                 Text("PROPERTIES / ${selected.name.uppercase(Locale.US)}", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                PropertySlider("Opacity", selected.opacity, { editorLayers[selectedIndex] = selected.copy(opacity = it) }, "0%", "100%", "${(selected.opacity * 100).toInt()}%")
-                                PropertySlider("Position X", selected.x, { editorLayers[selectedIndex] = selected.copy(x = it) }, "LEFT", "RIGHT", "${(selected.x * 100).toInt()}%")
-                                PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%")
-                                PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale))
-                                PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°")
+                                PropertySlider("Opacity", selected.opacity, { editorLayers[selectedIndex] = selected.copy(opacity = it) }, "0%", "100%", "${(selected.opacity * 100).toInt()}%", resetValue = 1f)
+                                PropertySlider("Position X", selected.x, { editorLayers[selectedIndex] = selected.copy(x = it) }, "LEFT", "RIGHT", "${(selected.x * 100).toInt()}%", resetValue = 0.5f)
+                                PropertySlider("Position Y", selected.y, { editorLayers[selectedIndex] = selected.copy(y = it) }, "TOP", "BOTTOM", "${(selected.y * 100).toInt()}%", resetValue = 0.5f)
+                                PropertySlider("Scale", ((selected.scale - 0.1f) / 2.9f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(scale = 0.1f + it * 2.9f) }, "0.1×", "3×", String.format(Locale.US, "%.2f×", selected.scale), resetValue = (1f - 0.1f) / 2.9f)
+                                PropertySlider("Rotation", (selected.rotation + 180f) / 360f, { editorLayers[selectedIndex] = selected.copy(rotation = -180f + it * 360f) }, "-180°", "180°", "${selected.rotation.toInt()}°", resetValue = 0.5f)
                                 if (selected.type == "Bars" || selected.type == "Particles") {
                                     Text("AUDIO / TIME MODULATION", color = StudioAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                                     MeasureDropdown("Position · Measure What", selected.positionMeasure) { editorLayers[selectedIndex] = selected.copy(positionMeasure = it) }
                                     MeasureDropdown("Scale · Measure What", selected.scaleMeasure) { editorLayers[selectedIndex] = selected.copy(scaleMeasure = it) }
                                     MeasureDropdown("Rotation · Measure What", selected.rotationMeasure) { editorLayers[selectedIndex] = selected.copy(rotationMeasure = it) }
-                                    PropertySlider("Measure amount", selected.measureAmount, { editorLayers[selectedIndex] = selected.copy(measureAmount = it) }, "SUBTLE", "STRONG", "${(selected.measureAmount * 100).toInt()}%")
+                                    PropertySlider("Measure amount", selected.measureAmount, { editorLayers[selectedIndex] = selected.copy(measureAmount = it) }, "SUBTLE", "STRONG", "${(selected.measureAmount * 100).toInt()}%", resetValue = 0.5f)
                                     PropertyInfoRow("Beat detection", "Bass FFT onset / live")
                                 }
                                 if (selected.type == "Particles") {
-                                    PropertySlider("Particle count", particleCount, { particleCount = it }, "20", "400", "${(20 + particleCount * 380).toInt()}")
-                                    PropertySlider("Movement speed", particleSpeed, { particleSpeed = it }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", 0.1f + particleSpeed * 3.9f))
-                                    PropertySlider("Particle size", particleSize, { particleSize = it }, "1 PX", "12 PX", "${(1f + particleSize * 11f).toInt()} px")
-                                    PropertySlider("Spread", particleSpread, { particleSpread = it }, "NARROW", "WIDE", "${((0.1f + particleSpread * 1.9f) * 100).toInt()}%")
+                                    PropertySlider("Particle count", particleCount, { particleCount = it }, "20", "400", "${(20 + particleCount * 380).toInt()}", resetValue = 0.30f)
+                                    PropertySlider("Movement speed", particleSpeed, { particleSpeed = it }, "SLOW", "FAST", String.format(Locale.US, "%.1f×", 0.1f + particleSpeed * 3.9f), resetValue = 0.35f)
+                                    PropertySlider("Particle size", particleSize, { particleSize = it }, "1 PX", "12 PX", "${(1f + particleSize * 11f).toInt()} px", resetValue = 0.25f)
+                                    PropertySlider("Spread", particleSpread, { particleSpread = it }, "NARROW", "WIDE", "${((0.1f + particleSpread * 1.9f) * 100).toInt()}%", resetValue = 0.40f)
                                     PropertyInfoRow("Renderer", "OpenGL ES / animated points")
                                     PropertyInfoRow("Audio response", "Live FFT energy modulation")
                                 }
                                 if (selected.type == "RGB Split") {
-                                    PropertySlider("Channel separation", selected.rgbSplitAmount, { editorLayers[selectedIndex] = selected.copy(rgbSplitAmount = it) }, "0 PX", "MAX", "${(selected.rgbSplitAmount * 100).toInt()}%")
+                                    PropertySlider("Channel separation", selected.rgbSplitAmount, { editorLayers[selectedIndex] = selected.copy(rgbSplitAmount = it) }, "0 PX", "MAX", "${(selected.rgbSplitAmount * 100).toInt()}%", resetValue = 0f)
                                     PropertyInfoRow("GPU renderer", "OpenGL RGB channel offsets")
                                     PropertyInfoRow("Effect scope", "Spectrum geometry only")
                                 }
@@ -552,23 +552,23 @@ fun AuralisApp() {
                                         textStyle = androidx.compose.ui.text.TextStyle(color = StudioWhite, fontSize = 11.sp),
                                         modifier = Modifier.fillMaxWidth().background(StudioBlack, RoundedCornerShape(2.dp)).padding(8.dp)
                                     )
-                                    PropertySlider("Font size", ((selected.fontSize - 8f) / 88f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(fontSize = 8f + it * 88f) }, "8 SP", "96 SP", "${selected.fontSize.toInt()} sp")
+                                    PropertySlider("Font size", ((selected.fontSize - 8f) / 88f).coerceIn(0f, 1f), { editorLayers[selectedIndex] = selected.copy(fontSize = 8f + it * 88f) }, "8 SP", "96 SP", "${selected.fontSize.toInt()} sp", resetValue = 0.25f)
                                     PropertyInfoRow("Text renderer", "Compose overlay / active")
                                 }
                                 Text("Text, image and particle layers render in preview. Other effects remain pending.", color = StudioMuted, fontSize = 8.sp)
                             }
                         }
                         2 -> {
-                            PropertySlider("Input gain", audioGain, { audioGain = it }, "QUIET", "LOUD", "${(audioGain * 100).toInt()}%")
-                            PropertySlider("Spectrum lower range", fftLower, { fftLower = it.coerceAtMost(fftUpper - 0.05f) }, "LOW", "MID", "${(20 + fftLower * 180).toInt()} Hz")
-                            PropertySlider("Spectrum upper range", fftUpper, { fftUpper = it.coerceAtLeast(fftLower + 0.05f) }, "MID", "HIGH", "${(200 + fftUpper * 17800).toInt()} Hz")
-                            PropertySlider("Beat sensitivity", beatSensitivity, { beatSensitivity = it }, "LESS", "MORE", "${(beatSensitivity * 100).toInt()}%")
+                            PropertySlider("Input gain", audioGain, { audioGain = it }, "QUIET", "LOUD", "${(audioGain * 100).toInt()}%", resetValue = 0.70f)
+                            PropertySlider("Spectrum lower range", fftLower, { fftLower = it.coerceAtMost(fftUpper - 0.05f) }, "LOW", "MID", "${(20 + fftLower * 180).toInt()} Hz", resetValue = 0.02f)
+                            PropertySlider("Spectrum upper range", fftUpper, { fftUpper = it.coerceAtLeast(fftLower + 0.05f) }, "MID", "HIGH", "${(200 + fftUpper * 17800).toInt()} Hz", resetValue = 0.92f)
+                            PropertySlider("Beat sensitivity", beatSensitivity, { beatSensitivity = it }, "LESS", "MORE", "${(beatSensitivity * 100).toInt()}%", resetValue = 0.55f)
                             PropertyInfoRow("Sample provider", "App playback / FFT")
                             PropertyInfoRow("FFT data", "128 logarithmic analysis bands")
                             PropertyInfoRow("Capture source", "This app's ExoPlayer session")
                         }
                         3 -> {
-                            PropertySlider("Glow intensity", glow, { glow = it }, "OFF", "MAX", "${(glow * 100).toInt()}%")
+                            PropertySlider("Glow intensity", glow, { glow = it }, "OFF", "MAX", "${(glow * 100).toInt()}%", resetValue = 0.25f)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Checkbox(checked = mirrorEnabled, onCheckedChange = { mirrorEnabled = it })
                                 Text("Mirror spectrum", color = StudioWhite, fontSize = 10.sp)
