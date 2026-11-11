@@ -1497,6 +1497,10 @@ private fun StudioPropertiesPanel(
     expandedGroup: String?,
     onExpandedGroupChange: (String?) -> Unit
 ) {
+    // Collect the StateFlow here: reading store.value() alone is not observable by Compose.
+    // This subscription makes every property control recompose on each immediate store update.
+    val liveValues by store.values.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1589,7 +1593,7 @@ private fun StudioPropertiesPanel(
                                 group.settings.forEach { spec ->
                                     SettingControl(
                                         spec = spec,
-                                        value = store.value(settingsKey, spec),
+                                        value = liveValues["$settingsKey.${spec.key}"] ?: store.value(settingsKey, spec),
                                         onValueChange = {
                                             store.update(settingsKey, spec, it)
                                         },
@@ -2223,7 +2227,9 @@ private fun SettingControl(
                     onValueChange = onValueChange,
                     modifier = Modifier.fillMaxWidth(),
                     minLines = if (spec.kind == SettingKind.CODE) 5 else 1,
-                    textStyle = MaterialTheme.typography.bodySmall
+                    textStyle = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = if (spec.kind == SettingKind.CODE) FontFamily.Monospace else MaterialTheme.typography.bodySmall.fontFamily
+                    )
                 )
             }
 
